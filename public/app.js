@@ -17,6 +17,7 @@ const clockMinInput = document.getElementById('clock-min');
 const clockIncInput = document.getElementById('clock-inc');
 const clockApplyBtn = document.getElementById('clock-apply');
 const flipBoardSelect = document.getElementById('flip-board');
+const opponentSelect = document.getElementById('opponent');
 const overlayEl = document.getElementById('overlay');
 const overlayTitle = document.getElementById('overlay-title');
 const overlayText = document.getElementById('overlay-text');
@@ -36,6 +37,8 @@ let localClockBaseMs = 5 * 60 * 1000;
 let localClockIncrementMs = 0;
 let flipBoardForBlack = true;
 let myFlagId = null;
+let aiEnabled = false;
+const aiColor = 'b';
 
 const PIECES = {
   w: { K: '♔', Q: '♕', R: '♖', B: '♗', N: '♘', P: '♙' },
@@ -77,6 +80,7 @@ function connect() {
 
   localMode = false;
   overlayHide();
+  aiEnabled = false;
 
   if (ws) ws.close();
   ws = new WebSocket(server);
@@ -364,6 +368,9 @@ function startLocalGame() {
   setStatus('Local hot-seat');
   log('Local game started. White chooses a flag first.');
   showOverlay('White player', 'Choose your flag pawn. Then pass the device.', 'I am White');
+  if (aiEnabled) {
+    autoChooseFlag(aiColor);
+  }
   startLocalClock();
 }
 
@@ -409,6 +416,7 @@ function endLocalTurn() {
     showGameOverOverlay(winner, gameState.reason);
   }
   render();
+  maybeAiMove();
 }
 
 function showGameOverOverlay(winner, reason) {
@@ -439,7 +447,9 @@ function chooseFlagLocal(color, x, y) {
     overlayHide();
   } else {
     localView = color === 'w' ? 'b' : 'w';
-    showOverlay(`${localView === 'w' ? 'White' : 'Black'} player`, 'Choose your flag pawn.', `I am ${localView === 'w' ? 'White' : 'Black'}`);
+    if (!aiEnabled) {
+      showOverlay(`${localView === 'w' ? 'White' : 'Black'} player`, 'Choose your flag pawn.', `I am ${localView === 'w' ? 'White' : 'Black'}`);
+    }
   }
   render();
 }
@@ -571,6 +581,41 @@ function applyMoveLocal(move) {
   }
 
   return { ok: true };
+}
+
+function autoChooseFlag(color) {
+  const row = color === 'w' ? 6 : 1;
+  const candidates = [];
+  for (let x = 0; x < 8; x++) {
+    const id = gameState.board[row][x];
+    if (!id) continue;
+    const piece = gameState.pieces.get(id);
+    if (piece && piece.type === 'P' && piece.color === color) candidates.push({ x, y: row });
+  }
+  if (candidates.length === 0) return;
+  const pick = candidates[Math.floor(Math.random() * candidates.length)];
+  chooseFlagLocal(color, pick.x, pick.y);
+}
+
+function maybeAiMove() {
+  if (!localMode || !aiEnabled) return;
+  if (!gameState.running || gameState.gameOver) return;
+  if (gameState.turn !== aiColor) return;
+  setTimeout(() => {
+    if (!localMode || !aiEnabled) return;
+    if (!gameState.running || gameState.gameOver) return;
+    if (gameState.turn !== aiColor) return;
+    const moves = generateMoves(gameState, aiColor);
+    if (moves.length === 0) return;
+    const captureMoves = moves.filter(m => {
+      const target = gameState.board[m.to.y][m.to.x];
+      return !!target || m.enPassant;
+    });
+    const list = captureMoves.length ? captureMoves : moves;
+    const choice = list[Math.floor(Math.random() * list.length)];
+    applyMoveLocal({ from: choice.from, to: choice.to });
+    endLocalTurn();
+  }, 350);
 }
 
 function updateMoveList() {
@@ -714,6 +759,7 @@ function updateModeUI() {
   createBtn.disabled = !online;
   joinBtn.disabled = !online;
   localStartBtn.disabled = online;
+  opponentSelect.disabled = online;
   setStatus(online ? 'Disconnected' : 'Local hot-seat');
 }
 
@@ -759,6 +805,8 @@ serverInput.value = localStorage.getItem('server') || getDefaultServer();
 nameInput.value = localStorage.getItem('name') || '';
 flipBoardSelect.value = localStorage.getItem('flipBoard') || 'on';
 flipBoardForBlack = flipBoardSelect.value === 'on';
+opponentSelect.value = localStorage.getItem('opponent') || 'human';
+aiEnabled = opponentSelect.value === 'ai';
 
 serverInput.addEventListener('change', () => localStorage.setItem('server', serverInput.value));
 nameInput.addEventListener('change', () => localStorage.setItem('name', nameInput.value));
@@ -766,6 +814,11 @@ flipBoardSelect.addEventListener('change', () => {
   localStorage.setItem('flipBoard', flipBoardSelect.value);
   flipBoardForBlack = flipBoardSelect.value === 'on';
   renderBoard();
+});
+
+opponentSelect.addEventListener('change', () => {
+  localStorage.setItem('opponent', opponentSelect.value);
+  aiEnabled = opponentSelect.value === 'ai';
 });
 
 clockMinInput.value = localStorage.getItem('clockMinutes') || '5';
