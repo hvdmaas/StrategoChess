@@ -15,34 +15,35 @@
     <div class="status" id="status">Disconnected</div>
   </header>
 
-  <section class="panel">
-    <div class="field">
-      <label for="mode">Mode</label>
-      <select id="mode">
-        <option value="online">Online</option>
-        <option value="local">Local hot-seat</option>
-      </select>
-    </div>
-    <div class="field">
-      <label for="server">Server URL</label>
-      <input id="server" type="text" placeholder="ws://localhost:8787" />
-    </div>
-    <div class="field">
-      <label for="name">Name</label>
-      <input id="name" type="text" placeholder="Player name" />
-    </div>
-    <div class="field">
-      <label for="room">Room</label>
-      <input id="room" type="text" placeholder="ABCD" maxlength="6" />
-    </div>
-    <div class="actions">
-      <button id="create">Create Room</button>
-      <button id="join">Join Room</button>
-      <button id="local-start">Start Local Game</button>
-    </div>
-  </section>
-
   <section class="game">
+    <div class="left-panel">
+      <div class="panel">
+        <div class="field">
+          <label for="mode">Mode</label>
+          <select id="mode">
+            <option value="online">Online</option>
+            <option value="local">Local hot-seat</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="server">Server URL</label>
+          <input id="server" type="text" placeholder="ws://localhost:8787" />
+        </div>
+        <div class="field">
+          <label for="name">Name</label>
+          <input id="name" type="text" placeholder="Player name" />
+        </div>
+        <div class="field">
+          <label for="room">Room</label>
+          <input id="room" type="text" placeholder="ABCD" maxlength="6" />
+        </div>
+        <div class="actions">
+          <button id="create">Create Room</button>
+          <button id="join">Join Room</button>
+          <button id="local-start">Start Local Game</button>
+        </div>
+      </div>
+    </div>
     <div class="board-wrap">
       <div class="clocks">
         <div class="clock" id="clock-black">

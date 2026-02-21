@@ -57,9 +57,11 @@ header {
 .panel {
   display: grid;
   gap: 16px;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  padding: 24px 32px;
+  grid-template-columns: 1fr;
+  padding: 16px;
   background: var(--bg2);
+  border: 1px solid #262c3c;
+  border-radius: 12px;
 }
 
  
@@ -112,13 +114,20 @@ button#local-start {
 
 .game {
   display: grid;
-  grid-template-columns: minmax(320px, 1fr) 280px;
+  grid-template-columns: 260px minmax(320px, 1fr) 320px;
   gap: 24px;
-  padding: 12px 32px 40px;
+  padding: 8px 32px 40px;
   flex: 1;
   align-items: start;
   justify-items: center;
-  min-height: calc(100vh - 220px);
+  min-height: calc(100vh - 200px);
+}
+
+.left-panel {
+  width: 100%;
+  display: grid;
+  gap: 16px;
+  align-self: start;
 }
 
 .board-wrap {
