@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Stratego Chess</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="title">Stratego Chess</div>
+      <div class="subtitle">Capture the hidden flag pawn. No check. No castling.</div>
+    </div>
+    <div class="status" id="status">Disconnected</div>
+  </header>
+
+  <section class="panel">
+    <div class="field">
+      <label for="mode">Mode</label>
+      <select id="mode">
+        <option value="online">Online</option>
+        <option value="local">Local hot-seat</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="server">Server URL</label>
+      <input id="server" type="text" placeholder="ws://localhost:8787" />
+    </div>
+    <div class="field">
+      <label for="name">Name</label>
+      <input id="name" type="text" placeholder="Player name" />
+    </div>
+    <div class="field">
+      <label for="room">Room</label>
+      <input id="room" type="text" placeholder="ABCD" maxlength="6" />
+    </div>
+    <div class="actions">
+      <button id="create">Create Room</button>
+      <button id="join">Join Room</button>
+      <button id="local-start">Start Local Game</button>
+    </div>
+  </section>
+
+  <section class="game">
+    <div class="board-wrap">
+      <div class="clocks">
+        <div class="clock" id="clock-black">
+          <div class="clock-label">Black</div>
+          <div class="clock-time" id="clock-b">05:00</div>
+        </div>
+        <div class="clock" id="clock-white">
+          <div class="clock-label">White</div>
+          <div class="clock-time" id="clock-w">05:00</div>
+        </div>
+      </div>
+      <div id="board" class="board"></div>
+    </div>
+    <div class="sidebar">
+      <div class="card" id="instructions">
+        <h3>Setup</h3>
+        <p>Select your hidden flag pawn by clicking one of your pawns. The other player cannot see it.</p>
+      </div>
+      <div class="card" id="clock-settings">
+        <h3>Clock</h3>
+        <div class="field">
+          <label for="clock-min">Minutes</label>
+          <input id="clock-min" type="number" min="1" max="60" value="5" />
+        </div>
+        <div class="field">
+          <label for="clock-inc">Increment (sec)</label>
+          <input id="clock-inc" type="number" min="0" max="30" value="0" />
+        </div>
+        <div class="actions">
+          <button id="clock-apply">Apply</button>
+        </div>
+      </div>
+      <div class="card" id="board-settings">
+        <h3>Board</h3>
+        <div class="field">
+          <label for="flip-board">Flip for Black</label>
+          <select id="flip-board">
+            <option value="on" selected>On</option>
+            <option value="off">Off</option>
+          </select>
+        </div>
+      </div>
+      <div class="card" id="rules-card">
+        <h3>Stratego Chess</h3>
+        <p>By Han van der Maas.</p>
+        <p>Stratego Chess combines ideas from Stratego and Chess on a standard chess board with standard chess pieces. One pawn per player is secretly marked as the flag. The goal is not checkmate: you win by capturing the opponent's hidden flag pawn.</p>
+        <h4>Objective</h4>
+        <p>Capture the opponent's flag pawn.</p>
+        <h4>Rules (differences from chess)</h4>
+        <ul>
+          <li>The king can be captured; this does not end the game.</li>
+          <li>No check rule: you are not required to move out of check.</li>
+          <li>Capturing the flag pawn wins the game.</li>
+          <li>Stalemate does not apply. If the flag must move into check, it must. If a player has no legal moves, they lose.</li>
+          <li>Castling is not allowed.</li>
+          <li>En passant is allowed.</li>
+          <li>Other draw rules still apply (threefold repetition, 50‑move rule, insufficient material, draw by agreement).</li>
+        </ul>
+        <h4>Setup</h4>
+        <p>Start from the normal chess position. Each player secretly chooses one of their pawns as the flag. When a pawn is captured, it is revealed whether it was the flag.</p>
+      </div>
+      <div class="card" id="log"></div>
+    </div>
+  </section>
+
+  <div id="overlay" class="overlay hidden">
+    <div class="overlay-card">
+      <div id="overlay-title" class="overlay-title">Pass Device</div>
+      <div id="overlay-text" class="overlay-text">Hand the device to the next player.</div>
+      <button id="overlay-btn">I am ready</button>
+    </div>
+  </div>
+
+  <footer>
+    <span>Rules summary: capture the opponent's flag pawn to win. No check. King can be captured. En passant allowed. No castling.</span>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
