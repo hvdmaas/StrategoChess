@@ -114,12 +114,12 @@ button#local-start {
 
 .game {
   display: grid;
-  grid-template-columns: 260px minmax(320px, 1fr) 320px;
+  grid-template-columns: minmax(360px, 1fr) 360px;
   gap: 24px;
   padding: 8px 32px 40px;
   flex: 1;
   align-items: start;
-  justify-items: center;
+  justify-items: stretch;
   min-height: calc(100vh - 200px);
 }
 
@@ -128,6 +128,7 @@ button#local-start {
   display: grid;
   gap: 16px;
   align-self: start;
+  justify-items: center;
 }
 
 .board-wrap {
@@ -338,5 +339,8 @@ footer {
   .board {
     width: min(90vw, 520px);
     height: min(90vw, 520px);
+  }
+  .left-panel {
+    justify-items: stretch;
   }
 }
