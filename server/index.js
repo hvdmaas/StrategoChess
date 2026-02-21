@@ -44,7 +44,9 @@ function createInitialState() {
     reason: null,
     flags: { w: null, b: null },
     playersReady: { w: false, b: false },
-    incrementMs: 0
+    incrementMs: 0,
+    lastMove: null,
+    moves: []
   };
 
   const backRank = ['R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R'];
@@ -85,6 +87,17 @@ function algebraicToCoords(square) {
   return { x: file, y: 8 - rank };
 }
 
+function formatSAN(piece, from, to, capture, promotion) {
+  const dest = coordsToAlgebraic(to.x, to.y);
+  const isPawn = piece.type === 'P';
+  const pieceLetter = isPawn ? '' : piece.type;
+  const captureMark = capture ? 'x' : '';
+  const originFile = String.fromCharCode(97 + from.x);
+  const pawnPrefix = isPawn && capture ? originFile : '';
+  const promo = promotion ? '=Q' : '';
+  return `${pieceLetter}${pawnPrefix}${captureMark}${dest}${promo}`;
+}
+
 function serializeState(state, perspective) {
   const revealFlags = state.gameOver;
   const board = state.board.map((row, y) =>
@@ -111,7 +124,9 @@ function serializeState(state, perspective) {
     reason: state.reason,
     playersReady: state.playersReady,
     flagId: revealFlags ? null : (perspective === 'w' || perspective === 'b' ? state.flags[perspective] : null),
-    incrementMs: state.incrementMs
+    incrementMs: state.incrementMs,
+    lastMove: state.lastMove,
+    moves: state.moves
   };
 }
 
@@ -311,11 +326,14 @@ function applyMove(state, move) {
   if (!legalMove) return { ok: false, error: 'illegal move' };
 
   let capturedId = state.board[move.to.y][move.to.x];
-  if (legalMove.enPassant) {
+  const isEnPassant = !!legalMove.enPassant;
+  if (isEnPassant) {
     const dir = piece.color === 'w' ? 1 : -1;
     capturedId = state.board[move.to.y + dir][move.to.x];
     state.board[move.to.y + dir][move.to.x] = null;
   }
+  const capture = !!capturedId || isEnPassant;
+  const promotion = piece.type === 'P' && (move.to.y === (piece.color === 'w' ? 0 : 7));
 
   if (capturedId) {
     const captured = state.pieces.get(capturedId);
@@ -341,6 +359,13 @@ function applyMove(state, move) {
   if (!state.gameOver && state.incrementMs > 0) {
     state.clocks[piece.color] += state.incrementMs;
   }
+
+  state.lastMove = { from: move.from, to: move.to };
+  const san = formatSAN(piece, move.from, move.to, capture, promotion);
+  const ply = state.moves.length;
+  const moveNo = Math.floor(ply / 2) + 1;
+  const prefix = piece.color === 'w' ? `${moveNo}. ` : `${moveNo}... `;
+  state.moves.push(prefix + san);
 
   state.enPassant = null;
   if (piece.type === 'P' && Math.abs(move.to.y - move.from.y) === 2) {

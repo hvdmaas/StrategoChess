@@ -21,6 +21,7 @@ const overlayEl = document.getElementById('overlay');
 const overlayTitle = document.getElementById('overlay-title');
 const overlayText = document.getElementById('overlay-text');
 const overlayBtn = document.getElementById('overlay-btn');
+const moveListEl = document.getElementById('move-list');
 
 let ws = null;
 let playerColor = null;
@@ -146,6 +147,7 @@ function render() {
   updateClocks();
   renderBoard();
   updateInstructions();
+  updateMoveList();
 }
 
 function updateClocks() {
@@ -231,6 +233,12 @@ function renderBoard() {
       });
 
       square.addEventListener('click', () => handleSquareClick(x, y));
+      if (gameState.lastMove) {
+        const lm = gameState.lastMove;
+        if ((lm.from.x === x && lm.from.y === y) || (lm.to.x === x && lm.to.y === y)) {
+          square.classList.add('last-move');
+        }
+      }
       boardEl.appendChild(square);
     }
   }
@@ -330,6 +338,17 @@ function handleLocalClick(x, y) {
 
 function coordsToAlg(x, y) {
   return String.fromCharCode(97 + x) + (8 - y);
+}
+
+function formatSANLocal(piece, from, to, capture, promotion) {
+  const dest = coordsToAlg(to.x, to.y);
+  const isPawn = piece.type === 'P';
+  const pieceLetter = isPawn ? '' : piece.type;
+  const captureMark = capture ? 'x' : '';
+  const originFile = String.fromCharCode(97 + from.x);
+  const pawnPrefix = isPawn && capture ? originFile : '';
+  const promo = promotion ? '=Q' : '';
+  return `${pieceLetter}${pawnPrefix}${captureMark}${dest}${promo}`;
 }
 
 function startLocalGame() {
@@ -461,7 +480,9 @@ function createInitialState() {
     winner: null,
     reason: null,
     flags: { w: null, b: null },
-    playersReady: { w: false, b: false }
+    playersReady: { w: false, b: false },
+    lastMove: null,
+    moves: []
   };
 
   const backRank = ['R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R'];
@@ -502,6 +523,8 @@ function applyMoveLocal(move) {
   if (!legalMove) return { ok: false, error: 'illegal move' };
 
   let capturedId = gameState.board[move.to.y][move.to.x];
+  const isEnPassant = !!legalMove.enPassant;
+  const capture = !!capturedId || isEnPassant;
   if (legalMove.enPassant) {
     const dir = piece.color === 'w' ? 1 : -1;
     capturedId = gameState.board[move.to.y + dir][move.to.x];
@@ -522,6 +545,7 @@ function applyMoveLocal(move) {
   gameState.board[move.from.y][move.from.x] = null;
   gameState.board[move.to.y][move.to.x] = fromId;
 
+  const promotion = piece.type === 'P' && (move.to.y === (piece.color === 'w' ? 0 : 7));
   if (piece.type === 'P') {
     const lastRank = piece.color === 'w' ? 0 : 7;
     if (move.to.y === lastRank) {
@@ -533,6 +557,13 @@ function applyMoveLocal(move) {
     gameState.clocks[piece.color] += localClockIncrementMs;
   }
 
+  gameState.lastMove = { from: move.from, to: move.to };
+  const san = formatSANLocal(piece, move.from, move.to, capture, promotion);
+  const ply = gameState.moves.length;
+  const moveNo = Math.floor(ply / 2) + 1;
+  const prefix = piece.color === 'w' ? `${moveNo}. ` : `${moveNo}... `;
+  gameState.moves.push(prefix + san);
+
   gameState.enPassant = null;
   if (piece.type === 'P' && Math.abs(move.to.y - move.from.y) === 2) {
     const dir = piece.color === 'w' ? -1 : 1;
@@ -540,6 +571,18 @@ function applyMoveLocal(move) {
   }
 
   return { ok: true };
+}
+
+function updateMoveList() {
+  if (!moveListEl || !gameState) return;
+  moveListEl.innerHTML = '';
+  const moves = gameState.moves || [];
+  moves.forEach((m, i) => {
+    const li = document.createElement('li');
+    li.textContent = m;
+    if (i === moves.length - 1) li.classList.add('latest');
+    moveListEl.appendChild(li);
+  });
 }
 
 function isInside(x, y) {

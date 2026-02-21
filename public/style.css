@@ -250,6 +250,32 @@ button#local-start {
   overflow: auto;
 }
 
+#moves-card {
+  max-height: 240px;
+  overflow: auto;
+}
+
+#move-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+#move-list li {
+  margin: 2px 0;
+  color: var(--muted);
+}
+
+#move-list li.latest {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.square.last-move {
+  outline: 3px solid rgba(60, 196, 183, 0.7);
+  z-index: 1;
+}
 #log {
   font-size: 14px;
   color: var(--muted);
