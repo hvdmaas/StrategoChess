@@ -18,6 +18,9 @@ const clockIncInput = document.getElementById('clock-inc');
 const clockApplyBtn = document.getElementById('clock-apply');
 const flipBoardSelect = document.getElementById('flip-board');
 const opponentSelect = document.getElementById('opponent');
+const aiRerollBtn = document.getElementById('ai-reroll');
+const puzzleSelect = document.getElementById('puzzle');
+const puzzleStartBtn = document.getElementById('puzzle-start');
 const overlayEl = document.getElementById('overlay');
 const overlayTitle = document.getElementById('overlay-title');
 const overlayText = document.getElementById('overlay-text');
@@ -39,6 +42,11 @@ let flipBoardForBlack = true;
 let myFlagId = null;
 let aiEnabled = false;
 const aiColor = 'b';
+let aiPendingTimeout = null;
+let lastAiMoveKey = null;
+let lastAiState = null;
+let puzzleMode = false;
+let puzzlePlayerColor = 'w';
 
 const PIECES = {
   w: { K: '♔', Q: '♕', R: '♖', B: '♗', N: '♘', P: '♙' },
@@ -152,6 +160,10 @@ function render() {
   renderBoard();
   updateInstructions();
   updateMoveList();
+  updateAiControls();
+  if (localMode && aiEnabled && gameState.running && !gameState.gameOver && gameState.turn === aiColor && !aiPendingTimeout) {
+    maybeAiMove();
+  }
 }
 
 function updateClocks() {
@@ -209,7 +221,8 @@ function renderBoard() {
         const showFlag = (
           (gameState.gameOver && piece.isFlag) ||
           (!localMode && myFlagId && piece.id === myFlagId) ||
-          (localMode && !gameState.running && !gameState.playersReady[viewColor] && piece.isFlag && piece.color === viewColor)
+          (localMode && !gameState.running && !gameState.playersReady[viewColor] && piece.isFlag && piece.color === viewColor) ||
+          (localMode && puzzleMode && piece.isFlag && piece.color === viewColor)
         );
         if (showFlag) square.classList.add('flagged');
 
@@ -362,6 +375,9 @@ function startLocalGame() {
   localOverlayLocked = true;
   lastGameOver = false;
   myFlagId = null;
+  lastAiMoveKey = null;
+  lastAiState = null;
+  puzzleMode = false;
   applyClockSettings();
   gameState = createInitialState();
   render();
@@ -601,21 +617,43 @@ function maybeAiMove() {
   if (!localMode || !aiEnabled) return;
   if (!gameState.running || gameState.gameOver) return;
   if (gameState.turn !== aiColor) return;
-  setTimeout(() => {
-    if (!localMode || !aiEnabled) return;
-    if (!gameState.running || gameState.gameOver) return;
-    if (gameState.turn !== aiColor) return;
-    const moves = generateMoves(gameState, aiColor);
-    if (moves.length === 0) return;
-    const captureMoves = moves.filter(m => {
-      const target = gameState.board[m.to.y][m.to.x];
-      return !!target || m.enPassant;
-    });
-    const list = captureMoves.length ? captureMoves : moves;
-    const choice = list[Math.floor(Math.random() * list.length)];
-    applyMoveLocal({ from: choice.from, to: choice.to });
-    endLocalTurn();
-  }, 350);
+  if (aiPendingTimeout) clearTimeout(aiPendingTimeout);
+  aiPendingTimeout = setTimeout(() => {
+    executeAiMove(false);
+  }, 1200);
+  updateAiControls();
+}
+
+function executeAiMove(forceDifferent) {
+  aiPendingTimeout = null;
+  if (!localMode || !aiEnabled) return;
+  if (!gameState.running || gameState.gameOver) return;
+  if (gameState.turn !== aiColor) return;
+  const moves = generateMoves(gameState, aiColor);
+  if (moves.length === 0) return;
+  const captureMoves = moves.filter(m => {
+    const target = gameState.board[m.to.y][m.to.x];
+    return !!target || m.enPassant;
+  });
+  const useCapture = captureMoves.length > 0 && Math.random() < 0.6;
+  let pool = useCapture ? captureMoves : moves;
+
+  if (forceDifferent && lastAiMoveKey && pool.length > 1) {
+    pool = pool.filter(m => `${m.from.x}${m.from.y}${m.to.x}${m.to.y}` !== lastAiMoveKey);
+    if (pool.length === 0) pool = useCapture ? captureMoves : moves;
+  }
+
+  const choice = pool[Math.floor(Math.random() * pool.length)];
+  lastAiMoveKey = `${choice.from.x}${choice.from.y}${choice.to.x}${choice.to.y}`;
+  lastAiState = cloneState(gameState);
+  applyMoveLocal({ from: choice.from, to: choice.to });
+  endLocalTurn();
+}
+
+function updateAiControls() {
+  if (!aiRerollBtn) return;
+  const enabled = localMode && aiEnabled && gameState && gameState.running && !gameState.gameOver && !!lastAiState;
+  aiRerollBtn.disabled = !enabled;
 }
 
 function updateMoveList() {
@@ -760,6 +798,9 @@ function updateModeUI() {
   joinBtn.disabled = !online;
   localStartBtn.disabled = online;
   opponentSelect.disabled = online;
+  puzzleSelect.disabled = online;
+  puzzleStartBtn.disabled = online;
+  if (aiRerollBtn) aiRerollBtn.disabled = true;
   setStatus(online ? 'Disconnected' : 'Local hot-seat');
 }
 
@@ -803,7 +844,7 @@ modeSelect.addEventListener('change', () => updateModeUI());
 
 serverInput.value = localStorage.getItem('server') || getDefaultServer();
 nameInput.value = localStorage.getItem('name') || '';
-flipBoardSelect.value = localStorage.getItem('flipBoard') || 'on';
+flipBoardSelect.value = localStorage.getItem('flipBoard') || 'off';
 flipBoardForBlack = flipBoardSelect.value === 'on';
 opponentSelect.value = localStorage.getItem('opponent') || 'human';
 aiEnabled = opponentSelect.value === 'ai';
@@ -820,6 +861,183 @@ opponentSelect.addEventListener('change', () => {
   localStorage.setItem('opponent', opponentSelect.value);
   aiEnabled = opponentSelect.value === 'ai';
 });
+
+aiRerollBtn.addEventListener('click', () => {
+  if (aiPendingTimeout) {
+    clearTimeout(aiPendingTimeout);
+    aiPendingTimeout = null;
+  }
+  if (lastAiState) {
+    gameState = cloneState(lastAiState);
+    lastAiState = null;
+    render();
+    executeAiMove(true);
+  } else {
+    executeAiMove(true);
+  }
+});
+
+puzzleStartBtn.addEventListener('click', () => {
+  const key = puzzleSelect.value;
+  if (!key) return;
+  startPuzzle(key);
+});
+
+function startPuzzle(key) {
+  localMode = true;
+  puzzleMode = true;
+  aiEnabled = true;
+  playerColor = 'w';
+  localView = 'w';
+  localOverlayLocked = false;
+  lastGameOver = false;
+  myFlagId = null;
+  lastAiMoveKey = null;
+  lastAiState = null;
+  applyClockSettings();
+  gameState = createEmptyState();
+
+  const puzzle = getPuzzle(key);
+  if (!puzzle) return;
+  puzzlePlayerColor = puzzle.playerColor;
+  setupPuzzlePosition(puzzle);
+
+  gameState.running = true;
+  gameState.turn = puzzle.toMove;
+  gameState.lastTick = Date.now();
+  render();
+  setStatus('Puzzle');
+  log(`Puzzle started: ${puzzle.name}`);
+  if (gameState.turn === aiColor) maybeAiMove();
+}
+
+function createEmptyState() {
+  return {
+    board: Array.from({ length: 8 }, () => Array(8).fill(null)),
+    pieces: new Map(),
+    turn: 'w',
+    enPassant: null,
+    clocks: { w: localClockBaseMs, b: localClockBaseMs },
+    lastTick: Date.now(),
+    running: false,
+    gameOver: false,
+    winner: null,
+    reason: null,
+    flags: { w: null, b: null },
+    playersReady: { w: true, b: true },
+    lastMove: null,
+    moves: []
+  };
+}
+
+function setupPuzzlePosition(puzzle) {
+  puzzle.white.forEach(p => addPiece(gameState, p.type, 'w', p.x, p.y));
+  puzzle.black.forEach(p => addPiece(gameState, p.type, 'b', p.x, p.y));
+
+  setRandomFlag('w');
+  setRandomFlag('b');
+}
+
+function setRandomFlag(color) {
+  const pawns = [];
+  for (const [id, piece] of gameState.pieces.entries()) {
+    if (piece.color === color && piece.type === 'P') pawns.push(id);
+  }
+  if (pawns.length === 0) return;
+  const flagId = pawns[Math.floor(Math.random() * pawns.length)];
+  const flagPiece = gameState.pieces.get(flagId);
+  flagPiece.isFlag = true;
+  gameState.flags[color] = flagId;
+}
+
+function getPuzzle(key) {
+  const puzzles = {
+    p1: {
+      name: 'Ra1/a5 vs Ra8/a7 (White to move)',
+      toMove: 'w',
+      playerColor: 'w',
+      white: [
+        algebraicPiece('R', 'a1'),
+        algebraicPiece('P', 'a5')
+      ],
+      black: [
+        algebraicPiece('R', 'a8'),
+        algebraicPiece('P', 'a7')
+      ]
+    },
+    p2: {
+      name: 'White e2 vs Black d7 (White to move)',
+      toMove: 'w',
+      playerColor: 'w',
+      white: [
+        algebraicPiece('P', 'e2')
+      ],
+      black: [
+        algebraicPiece('P', 'd7')
+      ]
+    },
+    p3: {
+      name: 'White e2,d2 vs Black d7,e7 (Black to move)',
+      toMove: 'b',
+      playerColor: 'w',
+      white: [
+        algebraicPiece('P', 'e2'),
+        algebraicPiece('P', 'd2')
+      ],
+      black: [
+        algebraicPiece('P', 'd7'),
+        algebraicPiece('P', 'e7')
+      ]
+    },
+    p4: {
+      name: 'White c2,d2,e2 vs Black c7,d7,e7 (White to move)',
+      toMove: 'w',
+      playerColor: 'w',
+      white: [
+        algebraicPiece('P', 'c2'),
+        algebraicPiece('P', 'd2'),
+        algebraicPiece('P', 'e2')
+      ],
+      black: [
+        algebraicPiece('P', 'c7'),
+        algebraicPiece('P', 'd7'),
+        algebraicPiece('P', 'e7')
+      ]
+    }
+  };
+  return puzzles[key];
+}
+
+function algebraicPiece(type, square) {
+  const x = square.charCodeAt(0) - 97;
+  const rank = parseInt(square[1], 10);
+  const y = 8 - rank;
+  return { type, x, y };
+}
+
+function cloneState(state) {
+  const board = state.board.map(row => row.slice());
+  const pieces = new Map();
+  for (const [id, piece] of state.pieces.entries()) {
+    pieces.set(id, { ...piece });
+  }
+  return {
+    board,
+    pieces,
+    turn: state.turn,
+    enPassant: state.enPassant ? { ...state.enPassant } : null,
+    clocks: { ...state.clocks },
+    lastTick: state.lastTick,
+    running: state.running,
+    gameOver: state.gameOver,
+    winner: state.winner,
+    reason: state.reason,
+    flags: { ...state.flags },
+    playersReady: { ...state.playersReady },
+    lastMove: state.lastMove ? { from: { ...state.lastMove.from }, to: { ...state.lastMove.to } } : null,
+    moves: state.moves ? state.moves.slice() : []
+  };
+}
 
 clockMinInput.value = localStorage.getItem('clockMinutes') || '5';
 clockIncInput.value = localStorage.getItem('clockIncrement') || '0';

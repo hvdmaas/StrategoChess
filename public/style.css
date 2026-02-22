@@ -64,6 +64,15 @@ header {
   border-radius: 12px;
 }
 
+.panel.wide {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.top-rules,
+.controls-wide {
+  padding: 8px 32px 0;
+}
+
  
 
 .field label {
@@ -255,11 +264,6 @@ button#local-start {
   min-height: 120px;
 }
 
-#rules-card {
-  max-height: 380px;
-  overflow: auto;
-}
-
 #moves-card {
   max-height: 240px;
   overflow: auto;
@@ -342,5 +346,9 @@ footer {
   }
   .left-panel {
     justify-items: stretch;
+  }
+  .top-rules,
+  .controls-wide {
+    padding: 8px 16px 0;
   }
 }

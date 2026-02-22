@@ -15,34 +15,37 @@
     <div class="status" id="status">Disconnected</div>
   </header>
 
+  <section class="controls-wide">
+    <div class="panel wide">
+      <div class="field">
+        <label for="mode">Mode</label>
+        <select id="mode">
+          <option value="online">Online</option>
+          <option value="local">Local hot-seat</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="server">Server URL</label>
+        <input id="server" type="text" placeholder="ws://localhost:8787" />
+      </div>
+      <div class="field">
+        <label for="name">Name</label>
+        <input id="name" type="text" placeholder="Player name" />
+      </div>
+      <div class="field">
+        <label for="room">Room</label>
+        <input id="room" type="text" placeholder="ABCD" maxlength="6" />
+      </div>
+      <div class="actions">
+        <button id="create">Create Room</button>
+        <button id="join">Join Room</button>
+        <button id="local-start">Start Local Game</button>
+      </div>
+    </div>
+  </section>
+
   <section class="game">
     <div class="left-panel">
-      <div class="panel">
-        <div class="field">
-          <label for="mode">Mode</label>
-          <select id="mode">
-            <option value="online">Online</option>
-            <option value="local">Local hot-seat</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="server">Server URL</label>
-          <input id="server" type="text" placeholder="ws://localhost:8787" />
-        </div>
-        <div class="field">
-          <label for="name">Name</label>
-          <input id="name" type="text" placeholder="Player name" />
-        </div>
-        <div class="field">
-          <label for="room">Room</label>
-          <input id="room" type="text" placeholder="ABCD" maxlength="6" />
-        </div>
-        <div class="actions">
-          <button id="create">Create Room</button>
-          <button id="join">Join Room</button>
-          <button id="local-start">Start Local Game</button>
-        </div>
-      </div>
       <div class="board-wrap">
         <div class="clocks">
           <div class="clock" id="clock-black">
@@ -81,8 +84,8 @@
         <div class="field">
           <label for="flip-board">Flip for Black</label>
           <select id="flip-board">
-            <option value="on" selected>On</option>
-            <option value="off">Off</option>
+            <option value="off" selected>Off</option>
+            <option value="on">On</option>
           </select>
         </div>
       </div>
@@ -96,30 +99,55 @@
           </select>
         </div>
       </div>
-      <div class="card" id="rules-card">
-        <h3>Stratego Chess</h3>
-        <p>By Han van der Maas.</p>
-        <p>Stratego Chess combines ideas from Stratego and Chess on a standard chess board with standard chess pieces. One pawn per player is secretly marked as the flag. The goal is not checkmate: you win by capturing the opponent's hidden flag pawn.</p>
-        <h4>Objective</h4>
-        <p>Capture the opponent's flag pawn.</p>
-        <h4>Rules (differences from chess)</h4>
-        <ul>
-          <li>The king can be captured; this does not end the game.</li>
-          <li>No check rule: you are not required to move out of check.</li>
-          <li>Capturing the flag pawn wins the game.</li>
-          <li>Stalemate does not apply. If the flag must move into check, it must. If a player has no legal moves, they lose.</li>
-          <li>Castling is not allowed.</li>
-          <li>En passant is allowed.</li>
-          <li>Other draw rules still apply (threefold repetition, 50‑move rule, insufficient material, draw by agreement).</li>
-        </ul>
-        <h4>Setup</h4>
-        <p>Start from the normal chess position. Each player secretly chooses one of their pawns as the flag. When a pawn is captured, it is revealed whether it was the flag.</p>
+      <div class="card" id="puzzle-settings">
+        <h3>Puzzles</h3>
+        <div class="field">
+          <label for="puzzle">Select Puzzle</label>
+          <select id="puzzle">
+            <option value="">None</option>
+            <option value="p1">Puzzle 1: Ra1/a5 vs Ra8/a7 (White to move)</option>
+            <option value="p2">Puzzle 2: White e2 vs Black d7 (White to move)</option>
+            <option value="p3">Puzzle 3: White e2,d2 vs Black d7,e7 (Black to move)</option>
+            <option value="p4">Puzzle 4: White c2,d2,e2 vs Black c7,d7,e7 (White to move)</option>
+          </select>
+        </div>
+        <div class="actions">
+          <button id="puzzle-start">Start Puzzle</button>
+        </div>
+      </div>
+      <div class="card" id="computer-controls">
+        <h3>Computer</h3>
+        <div class="actions">
+          <button id="ai-reroll">Another Move</button>
+        </div>
       </div>
       <div class="card" id="moves-card">
         <h3>Moves</h3>
         <ol id="move-list"></ol>
       </div>
       <div class="card" id="log"></div>
+    </div>
+  </section>
+
+  <section class="top-rules">
+    <div class="card">
+      <h3>Stratego Chess</h3>
+      <p>By Han van der Maas.</p>
+      <p>Stratego Chess combines ideas from Stratego and Chess on a standard chess board with standard chess pieces. One pawn per player is secretly marked as the flag. The goal is not checkmate: you win by capturing the opponent's hidden flag pawn.</p>
+      <h4>Objective</h4>
+      <p>Capture the opponent's flag pawn.</p>
+      <h4>Rules (differences from chess)</h4>
+      <ul>
+        <li>The king can be captured; this does not end the game.</li>
+        <li>No check rule: you are not required to move out of check.</li>
+        <li>Capturing the flag pawn wins the game.</li>
+        <li>Stalemate does not apply. If the flag must move into check, it must. If a player has no legal moves, they lose.</li>
+        <li>Castling is not allowed.</li>
+        <li>En passant is allowed.</li>
+        <li>Other draw rules still apply (threefold repetition, 50‑move rule, insufficient material, draw by agreement).</li>
+      </ul>
+      <h4>Setup</h4>
+      <p>Start from the normal chess position. Each player secretly chooses one of their pawns as the flag. When a pawn is captured, it is revealed whether it was the flag.</p>
     </div>
   </section>
 
