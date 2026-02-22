@@ -26,6 +26,10 @@ const overlayTitle = document.getElementById('overlay-title');
 const overlayText = document.getElementById('overlay-text');
 const overlayBtn = document.getElementById('overlay-btn');
 const moveListEl = document.getElementById('move-list');
+const resignBtn = document.getElementById('resign');
+const offerDrawBtn = document.getElementById('offer-draw');
+const acceptDrawBtn = document.getElementById('accept-draw');
+const declineDrawBtn = document.getElementById('decline-draw');
 
 let ws = null;
 let playerColor = null;
@@ -135,6 +139,10 @@ function connect() {
       updateClocks();
     }
 
+    if (msg.type === 'notice') {
+      log(msg.text);
+    }
+
     if (msg.type === 'clock_config') {
       clockMinInput.value = msg.minutes;
       clockIncInput.value = msg.increment;
@@ -161,6 +169,7 @@ function render() {
   updateInstructions();
   updateMoveList();
   updateAiControls();
+  updateActionButtons();
   if (localMode && aiEnabled && gameState.running && !gameState.gameOver && gameState.turn === aiColor && !aiPendingTimeout) {
     maybeAiMove();
   }
@@ -181,10 +190,10 @@ function updateInstructions() {
     return;
   }
   if (gameState.gameOver) {
-    const winner = gameState.winner ? gameState.winner.toUpperCase() : 'None';
-    instructionsEl.innerHTML = `<h3>Game Over</h3><p>Winner: ${winner} (${gameState.reason}). Flags revealed.</p>`;
-    log(`Game over. Winner: ${winner}. Reason: ${gameState.reason}.`);
-    showGameOverOverlay(winner, gameState.reason);
+    const winnerName = gameState.winner ? (gameState.winner === 'w' ? 'White' : 'Black') : 'Draw';
+    instructionsEl.innerHTML = `<h3>Game Over</h3><p>Winner: ${winnerName} (${gameState.reason}). Flags revealed.</p>`;
+    log(`Game over. Winner: ${winnerName}. Reason: ${gameState.reason}.`);
+    showGameOverOverlay(winnerName, gameState.reason);
     return;
   }
 
@@ -508,7 +517,8 @@ function createInitialState() {
     flags: { w: null, b: null },
     playersReady: { w: false, b: false },
     lastMove: null,
-    moves: []
+    moves: [],
+    drawOfferedBy: null
   };
 
   const backRank = ['R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R'];
@@ -654,6 +664,20 @@ function updateAiControls() {
   if (!aiRerollBtn) return;
   const enabled = localMode && aiEnabled && gameState && gameState.running && !gameState.gameOver && !!lastAiState;
   aiRerollBtn.disabled = !enabled;
+}
+
+function updateActionButtons() {
+  if (!gameState) return;
+  const inGame = gameState.running && !gameState.gameOver;
+  const isPlayer = localMode || playerColor === 'w' || playerColor === 'b';
+  const myColor = localMode ? gameState.turn : playerColor;
+  const drawOfferedBy = gameState.drawOfferedBy;
+
+  if (resignBtn) resignBtn.disabled = !inGame || !isPlayer;
+  if (offerDrawBtn) offerDrawBtn.disabled = !inGame || !isPlayer || !!drawOfferedBy;
+  const canRespond = drawOfferedBy && drawOfferedBy !== myColor;
+  if (acceptDrawBtn) acceptDrawBtn.disabled = !inGame || !isPlayer || !canRespond;
+  if (declineDrawBtn) declineDrawBtn.disabled = !inGame || !isPlayer || !canRespond;
 }
 
 function updateMoveList() {
@@ -877,6 +901,59 @@ aiRerollBtn.addEventListener('click', () => {
   }
 });
 
+resignBtn.addEventListener('click', () => {
+  if (!gameState || gameState.gameOver) return;
+  if (localMode) {
+    gameState.gameOver = true;
+    gameState.running = false;
+    gameState.winner = gameState.turn === 'w' ? 'b' : 'w';
+    gameState.reason = 'resign';
+    render();
+    return;
+  }
+  send({ type: 'resign' });
+});
+
+offerDrawBtn.addEventListener('click', () => {
+  if (!gameState || gameState.gameOver) return;
+  if (localMode) {
+    gameState.drawOfferedBy = gameState.turn;
+    log(`${gameState.turn === 'w' ? 'White' : 'Black'} offered a draw.`);
+    render();
+    return;
+  }
+  send({ type: 'offer_draw' });
+});
+
+acceptDrawBtn.addEventListener('click', () => {
+  if (!gameState || gameState.gameOver) return;
+  if (localMode) {
+    if (gameState.drawOfferedBy && gameState.drawOfferedBy !== gameState.turn) {
+      gameState.gameOver = true;
+      gameState.running = false;
+      gameState.winner = null;
+      gameState.reason = 'draw';
+      gameState.drawOfferedBy = null;
+      render();
+    }
+    return;
+  }
+  send({ type: 'accept_draw' });
+});
+
+declineDrawBtn.addEventListener('click', () => {
+  if (!gameState || gameState.gameOver) return;
+  if (localMode) {
+    if (gameState.drawOfferedBy && gameState.drawOfferedBy !== gameState.turn) {
+      gameState.drawOfferedBy = null;
+      log('Draw declined.');
+      render();
+    }
+    return;
+  }
+  send({ type: 'decline_draw' });
+});
+
 puzzleStartBtn.addEventListener('click', () => {
   const key = puzzleSelect.value;
   if (!key) return;
@@ -926,7 +1003,8 @@ function createEmptyState() {
     flags: { w: null, b: null },
     playersReady: { w: true, b: true },
     lastMove: null,
-    moves: []
+    moves: [],
+    drawOfferedBy: null
   };
 }
 

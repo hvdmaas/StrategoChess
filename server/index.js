@@ -46,7 +46,8 @@ function createInitialState() {
     playersReady: { w: false, b: false },
     incrementMs: 0,
     lastMove: null,
-    moves: []
+    moves: [],
+    drawOfferedBy: null
   };
 
   const backRank = ['R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R'];
@@ -126,7 +127,8 @@ function serializeState(state, perspective) {
     flagId: revealFlags ? null : (perspective === 'w' || perspective === 'b' ? state.flags[perspective] : null),
     incrementMs: state.incrementMs,
     lastMove: state.lastMove,
-    moves: state.moves
+    moves: state.moves,
+    drawOfferedBy: state.drawOfferedBy
   };
 }
 
@@ -442,6 +444,43 @@ function handleClockConfig(room, ws, color, minutes, increment) {
   broadcastState(room);
 }
 
+function handleResign(room, color) {
+  if (room.state.gameOver) return;
+  room.state.gameOver = true;
+  room.state.running = false;
+  room.state.winner = color === 'w' ? 'b' : 'w';
+  room.state.reason = 'resign';
+  broadcast(room, { type: 'notice', text: `${color === 'w' ? 'White' : 'Black'} resigned.` });
+  broadcastState(room);
+}
+
+function handleOfferDraw(room, color) {
+  if (room.state.gameOver) return;
+  room.state.drawOfferedBy = color;
+  broadcast(room, { type: 'notice', text: `${color === 'w' ? 'White' : 'Black'} offered a draw.` });
+  broadcastState(room);
+}
+
+function handleAcceptDraw(room, color) {
+  if (room.state.gameOver) return;
+  if (!room.state.drawOfferedBy || room.state.drawOfferedBy === color) return;
+  room.state.gameOver = true;
+  room.state.running = false;
+  room.state.winner = null;
+  room.state.reason = 'draw';
+  room.state.drawOfferedBy = null;
+  broadcast(room, { type: 'notice', text: 'Draw agreed.' });
+  broadcastState(room);
+}
+
+function handleDeclineDraw(room, color) {
+  if (room.state.gameOver) return;
+  if (!room.state.drawOfferedBy || room.state.drawOfferedBy === color) return;
+  room.state.drawOfferedBy = null;
+  broadcast(room, { type: 'notice', text: `${color === 'w' ? 'White' : 'Black'} declined the draw.` });
+  broadcastState(room);
+}
+
 wss.on('connection', (ws) => {
   let room = null;
   let color = null;
@@ -491,6 +530,22 @@ wss.on('connection', (ws) => {
 
     if (msg.type === 'set_clock') {
       handleClockConfig(room, ws, color, msg.minutes, msg.increment);
+    }
+
+    if (msg.type === 'resign') {
+      handleResign(room, color);
+    }
+
+    if (msg.type === 'offer_draw') {
+      handleOfferDraw(room, color);
+    }
+
+    if (msg.type === 'accept_draw') {
+      handleAcceptDraw(room, color);
+    }
+
+    if (msg.type === 'decline_draw') {
+      handleDeclineDraw(room, color);
     }
   });
 

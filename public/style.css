@@ -121,6 +121,18 @@ button#local-start {
   color: #0b0d12;
 }
 
+button#resign {
+  background: #e45756;
+  color: #fff;
+}
+
+button#offer-draw,
+button#accept-draw,
+button#decline-draw {
+  background: #3cc4b7;
+  color: #081413;
+}
+
 .game {
   display: grid;
   grid-template-columns: minmax(360px, 1fr) 360px;
