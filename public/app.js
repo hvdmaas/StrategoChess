@@ -73,7 +73,8 @@ function fmt(ms) {
 }
 
 function randomRoom() {
-  return String(Math.floor(Math.random() * 1000000)).padStart(6, '0');
+  // Generate 4-digit code
+  return String(Math.floor(Math.random() * 9000) + 1000);
 }
 
 function getDefaultServer() {
@@ -881,11 +882,19 @@ function applyClockSettings() {
 }
 
 createBtn.addEventListener('click', () => {
+  if (createBtn.disabled) return;
+  createBtn.disabled = true;
   roomInput.value = randomRoom();
   connect();
+  setTimeout(() => createBtn.disabled = false, 3000);
 });
 
-joinBtn.addEventListener('click', () => connect());
+joinBtn.addEventListener('click', () => {
+  if (joinBtn.disabled) return;
+  joinBtn.disabled = true;
+  connect();
+  setTimeout(() => joinBtn.disabled = false, 3000);
+});
 localStartBtn.addEventListener('click', () => startLocalGame());
 clockApplyBtn.addEventListener('click', () => applyClockSettings());
 

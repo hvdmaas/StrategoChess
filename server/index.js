@@ -496,7 +496,11 @@ wss.on('connection', (ws) => {
     if (msg.type === 'hello') {
       const code = (msg.room || '').trim().toUpperCase();
       room = getRoom(code || 'DEFAULT');
-      if (!room.players.w) {
+      if (room.state.running) {
+        // Game already started, join as spectator
+        room.spectators.add(ws);
+        color = 'spectator';
+      } else if (!room.players.w) {
         room.players.w = ws;
         color = 'w';
       } else if (!room.players.b) {
