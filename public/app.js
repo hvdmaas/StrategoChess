@@ -197,10 +197,22 @@ function updateInstructions() {
     return;
   }
 
-  if (!gameState.playersReady[playerColor]) {
+  const currentColor = localMode ? localView : playerColor;
+  if (!gameState.playersReady[currentColor]) {
     instructionsEl.innerHTML = `<h3>Choose Your Flag</h3><p>Click one of your pawns to mark it as the hidden flag.</p>`;
     return;
   }
+
+  if (gameState.drawOfferedBy) {
+    const offerColor = gameState.drawOfferedBy;
+    if (offerColor === currentColor) {
+      instructionsEl.innerHTML = `<h3>Draw Offered</h3><p>You offered a draw. Waiting for opponent to respond.</p>`;
+    } else {
+      instructionsEl.innerHTML = `<h3>Draw Offered</h3><p>${offerColor === 'w' ? 'White' : 'Black'} offered a draw. Accept or decline?</p>`;
+    }
+    return;
+  }
+
   instructionsEl.innerHTML = `<h3>Play</h3><p>Game in progress.</p>`;
 }
 
@@ -231,7 +243,8 @@ function renderBoard() {
           (gameState.gameOver && piece.isFlag) ||
           (!localMode && myFlagId && piece.id === myFlagId) ||
           (localMode && !gameState.running && !gameState.playersReady[viewColor] && piece.isFlag && piece.color === viewColor) ||
-          (localMode && puzzleMode && piece.isFlag && piece.color === viewColor)
+          (localMode && puzzleMode && piece.isFlag && piece.color === viewColor) ||
+          (localMode && gameState.running && piece.isFlag && piece.color === 'w')
         );
         if (showFlag) square.classList.add('flagged');
 
@@ -441,7 +454,7 @@ function endLocalTurn() {
     showGameOverOverlay(winner, gameState.reason);
   }
   render();
-  maybeAiMove();
+  // Note: render() already calls maybeAiMove() for AI, no need to duplicate
 }
 
 function showGameOverOverlay(winner, reason) {
@@ -640,7 +653,11 @@ function executeAiMove(forceDifferent) {
   if (!gameState.running || gameState.gameOver) return;
   if (gameState.turn !== aiColor) return;
   const moves = generateMoves(gameState, aiColor);
-  if (moves.length === 0) return;
+  if (moves.length === 0) {
+    // No legal moves available - end turn to trigger game over logic
+    endLocalTurn();
+    return;
+  }
   const captureMoves = moves.filter(m => {
     const target = gameState.board[m.to.y][m.to.x];
     return !!target || m.enPassant;
@@ -670,7 +687,7 @@ function updateActionButtons() {
   if (!gameState) return;
   const inGame = gameState.running && !gameState.gameOver;
   const isPlayer = localMode || playerColor === 'w' || playerColor === 'b';
-  const myColor = localMode ? gameState.turn : playerColor;
+  const myColor = localMode ? localView : playerColor;
   const drawOfferedBy = gameState.drawOfferedBy;
 
   if (resignBtn) resignBtn.disabled = !inGame || !isPlayer;
@@ -919,6 +936,8 @@ offerDrawBtn.addEventListener('click', () => {
   if (localMode) {
     gameState.drawOfferedBy = gameState.turn;
     log(`${gameState.turn === 'w' ? 'White' : 'Black'} offered a draw.`);
+    // Switch view to the other player so they can respond
+    localView = gameState.turn === 'w' ? 'b' : 'w';
     render();
     return;
   }
@@ -947,6 +966,8 @@ declineDrawBtn.addEventListener('click', () => {
     if (gameState.drawOfferedBy && gameState.drawOfferedBy !== gameState.turn) {
       gameState.drawOfferedBy = null;
       log('Draw declined.');
+      // Switch view back to the current turn player
+      localView = gameState.turn;
       render();
     }
     return;
