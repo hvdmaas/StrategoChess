@@ -73,7 +73,7 @@ function fmt(ms) {
 }
 
 function randomRoom() {
-  return Math.random().toString(36).slice(2, 6).toUpperCase();
+  return String(Math.floor(Math.random() * 1000000)).padStart(6, '0');
 }
 
 function getDefaultServer() {
@@ -82,7 +82,7 @@ function getDefaultServer() {
 
 function connect() {
   const server = serverInput.value.trim();
-  const room = roomInput.value.trim().toUpperCase();
+  const room = roomInput.value.trim();
   const name = nameInput.value.trim() || 'Player';
 
   if (!server || !room) {
@@ -403,7 +403,7 @@ function startLocalGame() {
   applyClockSettings();
   gameState = createInitialState();
   render();
-  setStatus('Local hot-seat');
+  setStatus('Offline');
   log('Local game started. White chooses a flag first.');
   showOverlay('White player', 'Choose your flag pawn. Then pass the device.', 'I am White');
   if (aiEnabled) {
@@ -691,7 +691,15 @@ function updateActionButtons() {
   const drawOfferedBy = gameState.drawOfferedBy;
 
   if (resignBtn) resignBtn.disabled = !inGame || !isPlayer;
-  if (offerDrawBtn) offerDrawBtn.disabled = !inGame || !isPlayer || !!drawOfferedBy;
+  if (offerDrawBtn) {
+    offerDrawBtn.disabled = !inGame || !isPlayer || !!drawOfferedBy;
+    // Highlight the button if current player offered a draw
+    if (drawOfferedBy === myColor) {
+      offerDrawBtn.classList.add('draw-offered');
+    } else {
+      offerDrawBtn.classList.remove('draw-offered');
+    }
+  }
   const canRespond = drawOfferedBy && drawOfferedBy !== myColor;
   if (acceptDrawBtn) acceptDrawBtn.disabled = !inGame || !isPlayer || !canRespond;
   if (declineDrawBtn) declineDrawBtn.disabled = !inGame || !isPlayer || !canRespond;
@@ -842,7 +850,7 @@ function updateModeUI() {
   puzzleSelect.disabled = online;
   puzzleStartBtn.disabled = online;
   if (aiRerollBtn) aiRerollBtn.disabled = true;
-  setStatus(online ? 'Disconnected' : 'Local hot-seat');
+  setStatus(online ? 'Disconnected' : 'Offline');
 }
 
 
@@ -942,6 +950,11 @@ offerDrawBtn.addEventListener('click', () => {
     return;
   }
   send({ type: 'offer_draw' });
+  // Immediately update UI to show draw was offered
+  if (gameState) {
+    gameState.drawOfferedBy = playerColor;
+    render();
+  }
 });
 
 acceptDrawBtn.addEventListener('click', () => {

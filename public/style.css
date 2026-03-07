@@ -133,6 +133,13 @@ button#decline-draw {
   color: #081413;
 }
 
+button.draw-offered {
+  background: #ffd700;
+  color: #000;
+  box-shadow: 0 0 12px rgba(255, 215, 0, 0.6);
+  font-weight: 700;
+}
+
 .game {
   display: grid;
   grid-template-columns: minmax(360px, 1fr) 360px;

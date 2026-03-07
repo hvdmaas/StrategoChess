@@ -10,7 +10,7 @@
   <header>
     <div class="brand">
       <div class="title">Stratego Chess</div>
-      <div class="subtitle">Capture the hidden flag pawn. No check. No castling.</div>
+      <div class="subtitle">Stratego Chess combines ideas from Stratego and Chess on a standard chess board with standard chess pieces. One pawn per player is secretly marked as the flag. The goal is not checkmate: you win by capturing the opponent's hidden flag pawn.</div>
     </div>
     <div class="status" id="status">Disconnected</div>
   </header>
@@ -21,7 +21,7 @@
         <label for="mode">Mode</label>
         <select id="mode">
           <option value="online">Online</option>
-          <option value="local">Local hot-seat</option>
+          <option value="local">Offline</option>
         </select>
       </div>
       <div class="field">
@@ -34,7 +34,7 @@
       </div>
       <div class="field">
         <label for="room">Room</label>
-        <input id="room" type="text" placeholder="ABCD" maxlength="6" />
+        <input id="room" type="number" placeholder="123456" min="1" />
       </div>
       <div class="actions">
         <button id="create">Create Room</button>
@@ -142,7 +142,6 @@
     <div class="card">
       <h3>Stratego Chess</h3>
       <p>By Han van der Maas.</p>
-      <p>Stratego Chess combines ideas from Stratego and Chess on a standard chess board with standard chess pieces. One pawn per player is secretly marked as the flag. The goal is not checkmate: you win by capturing the opponent's hidden flag pawn.</p>
       <h4>Objective</h4>
       <p>Capture the opponent's flag pawn.</p>
       <h4>Rules (differences from chess)</h4>
