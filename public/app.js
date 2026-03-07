@@ -49,6 +49,7 @@ const aiColor = 'b';
 let aiPendingTimeout = null;
 let lastAiMoveKey = null;
 let lastAiState = null;
+let aiStrength = 'random'; // 'random' or 'minimax'
 let puzzleMode = false;
 let puzzlePlayerColor = 'w';
 
@@ -407,9 +408,6 @@ function startLocalGame() {
   setStatus('Offline');
   log('Local game started. White chooses a flag first.');
   showOverlay('White player', 'Choose your flag pawn. Then pass the device.', 'I am White');
-  if (aiEnabled) {
-    autoChooseFlag(aiColor);
-  }
   startLocalClock();
 }
 
@@ -477,6 +475,11 @@ function chooseFlagLocal(color, x, y) {
   piece.isFlag = true;
   gameState.flags[color] = id;
   gameState.playersReady[color] = true;
+
+  // If AI is enabled and this is the human choosing white flag, let AI choose black flag
+  if (aiEnabled && color === 'w' && !gameState.playersReady.b) {
+    autoChooseFlag('b');
+  }
 
   if (gameState.playersReady.w && gameState.playersReady.b) {
     gameState.running = true;
@@ -659,23 +662,258 @@ function executeAiMove(forceDifferent) {
     endLocalTurn();
     return;
   }
-  const captureMoves = moves.filter(m => {
-    const target = gameState.board[m.to.y][m.to.x];
-    return !!target || m.enPassant;
-  });
-  const useCapture = captureMoves.length > 0 && Math.random() < 0.6;
-  let pool = useCapture ? captureMoves : moves;
 
-  if (forceDifferent && lastAiMoveKey && pool.length > 1) {
-    pool = pool.filter(m => `${m.from.x}${m.from.y}${m.to.x}${m.to.y}` !== lastAiMoveKey);
-    if (pool.length === 0) pool = useCapture ? captureMoves : moves;
+  let chosenMove;
+  if (aiStrength === 'minimax') {
+    chosenMove = findBestMove(gameState, aiColor, 4); // Search depth 4
+  } else {
+    // Original random AI
+    const captureMoves = moves.filter(m => {
+      const target = gameState.board[m.to.y][m.to.x];
+      return !!target || m.enPassant;
+    });
+    const useCapture = captureMoves.length > 0 && Math.random() < 0.6;
+    let pool = useCapture ? captureMoves : moves;
+
+    if (forceDifferent && lastAiMoveKey && pool.length > 1) {
+      pool = pool.filter(m => `${m.from.x}${m.from.y}${m.to.x}${m.to.y}` !== lastAiMoveKey);
+      if (pool.length === 0) pool = useCapture ? captureMoves : moves;
+    }
+
+    chosenMove = pool[Math.floor(Math.random() * pool.length)];
   }
 
-  const choice = pool[Math.floor(Math.random() * pool.length)];
-  lastAiMoveKey = `${choice.from.x}${choice.from.y}${choice.to.x}${choice.to.y}`;
+  lastAiMoveKey = `${chosenMove.from.x}${chosenMove.from.y}${chosenMove.to.x}${chosenMove.to.y}`;
   lastAiState = cloneState(gameState);
-  applyMoveLocal({ from: choice.from, to: choice.to });
+  applyMoveLocal({ from: chosenMove.from, to: chosenMove.to });
   endLocalTurn();
+}
+
+function findBestMove(state, color, depth) {
+  const moves = generateMoves(state, color);
+  if (moves.length === 0) return null;
+
+  let bestMove = null;
+  let bestValue = -Infinity;
+
+  for (const move of moves) {
+    // Make the move
+    const newState = makeMove(state, move);
+    const value = -minimax(newState, depth - 1, -color);
+
+    if (value > bestValue) {
+      bestValue = value;
+      bestMove = move;
+    }
+  }
+
+  return bestMove;
+}
+
+function minimax(state, depth, color) {
+  if (depth === 0 || state.gameOver) {
+    return evaluateBoard(state, color);
+  }
+
+  const moves = generateMoves(state, color);
+  if (moves.length === 0) {
+    // No moves available - bad for current player
+    return color === 'w' ? -10000 : 10000;
+  }
+
+  let bestValue = -Infinity;
+  if (color !== state.turn) bestValue = Infinity; // Opponent's turn
+
+  for (const move of moves) {
+    const newState = makeMove(state, move);
+    const value = -minimax(newState, depth - 1, color === 'w' ? 'b' : 'w');
+    if (color === state.turn) {
+      bestValue = Math.max(bestValue, value);
+    } else {
+      bestValue = Math.min(bestValue, value);
+    }
+  }
+
+  return bestValue;
+}
+
+function makeMove(state, move) {
+  const newState = cloneState(state);
+  const fromId = newState.board[move.from.y][move.from.x];
+  if (!fromId) return newState;
+
+  const piece = newState.pieces.get(fromId);
+  let capturedId = newState.board[move.to.y][move.to.x];
+
+  // Handle en passant
+  if (move.enPassant) {
+    const dir = piece.color === 'w' ? 1 : -1;
+    capturedId = newState.board[move.to.y + dir][move.to.x];
+    newState.board[move.to.y + dir][move.to.x] = null;
+  }
+
+  // Handle captures
+  if (capturedId) {
+    const captured = newState.pieces.get(capturedId);
+    if (captured.isFlag) {
+      newState.gameOver = true;
+      newState.winner = piece.color;
+      newState.reason = 'flag captured';
+    }
+    newState.pieces.delete(capturedId);
+  }
+
+  // Move piece
+  newState.board[move.from.y][move.from.x] = null;
+  newState.board[move.to.y][move.to.x] = fromId;
+
+  // Pawn promotion
+  if (piece.type === 'P' && ((piece.color === 'w' && move.to.y === 0) || (piece.color === 'b' && move.to.y === 7))) {
+    piece.type = 'Q';
+  }
+
+  // Update turn
+  newState.turn = newState.turn === 'w' ? 'b' : 'w';
+
+  // Check for no legal moves
+  const nextMoves = generateMoves(newState, newState.turn);
+  if (nextMoves.length === 0 && !newState.gameOver) {
+    newState.gameOver = true;
+    newState.winner = newState.turn === 'w' ? 'b' : 'w';
+    newState.reason = 'no legal moves';
+  }
+
+  return newState;
+}
+
+function evaluateBoard(state, color) {
+  if (state.gameOver) {
+    if (state.winner === color) return 100000;
+    if (state.winner === (color === 'w' ? 'b' : 'w')) return -100000;
+    return 0; // Draw
+  }
+
+  const pieceValues = { P: 100, N: 320, B: 330, R: 500, Q: 900, K: 20000 };
+
+  let score = 0;
+
+  // Material balance
+  for (const [id, piece] of state.pieces.entries()) {
+    const value = pieceValues[piece.type] || 0;
+    score += piece.color === color ? value : -value;
+  }
+
+  // Find flags
+  const myFlag = Array.from(state.pieces.values()).find(p => p.isFlag && p.color === color);
+  const opponentFlag = Array.from(state.pieces.values()).find(p => p.isFlag && p.color !== color);
+
+  // HUGE penalty if our flag is under attack
+  if (myFlag) {
+    const myFlagAttackers = countAttackers(state, myFlag, color === 'w' ? 'b' : 'w');
+    if (myFlagAttackers > 0) {
+      score -= 3000; // Enemy can capture our flag - critical danger
+    }
+  }
+
+  // HUGE bonus if we can attack opponent's flag
+  if (opponentFlag) {
+    const opponentFlagAttackers = countAttackers(state, opponentFlag, color);
+    if (opponentFlagAttackers > 0) {
+      score += 5000; // We can win by capturing flag!
+    }
+    
+    // Also bonus for protecting our ability to attack their flag
+    const myPiecesNearFlag = countPiecesNearFlag(state, opponentFlag, color);
+    score += myPiecesNearFlag * 200;
+  }
+
+  // Bonus for protecting our own flag
+  if (myFlag) {
+    const protectors = countProtectors(state, myFlag);
+    score += protectors * 100;
+  }
+
+  return score;
+}
+
+function countProtectors(state, piece) {
+  // Find piece position on board
+  let pieceX, pieceY;
+  for (let y = 0; y < 8; y++) {
+    for (let x = 0; x < 8; x++) {
+      if (state.board[y][x] === piece.id) {
+        pieceX = x;
+        pieceY = y;
+        break;
+      }
+    }
+    if (pieceX !== undefined) break;
+  }
+
+  const moves = generateMoves(state, piece.color);
+  let protectors = 0;
+  for (const move of moves) {
+    if (move.to.x === pieceX && move.to.y === pieceY) {
+      protectors++;
+    }
+  }
+  return protectors;
+}
+
+function countAttackers(state, piece, attackerColor) {
+  // Find piece position on board
+  let pieceX, pieceY;
+  for (let y = 0; y < 8; y++) {
+    for (let x = 0; x < 8; x++) {
+      if (state.board[y][x] === piece.id) {
+        pieceX = x;
+        pieceY = y;
+        break;
+      }
+    }
+    if (pieceX !== undefined) break;
+  }
+
+  const moves = generateMoves(state, attackerColor);
+  let attackers = 0;
+  for (const move of moves) {
+    if (move.to.x === pieceX && move.to.y === pieceY) {
+      attackers++;
+    }
+  }
+  return attackers;
+}
+
+function countPiecesNearFlag(state, flagPiece, color) {
+  // Find flag position
+  let flagX, flagY;
+  for (let y = 0; y < 8; y++) {
+    for (let x = 0; x < 8; x++) {
+      if (state.board[y][x] === flagPiece.id) {
+        flagX = x;
+        flagY = y;
+        break;
+      }
+    }
+    if (flagX !== undefined) break;
+  }
+
+  let count = 0;
+  // Count our pieces within 2 squares of the flag (distance metric)
+  for (let y = 0; y < 8; y++) {
+    for (let x = 0; x < 8; x++) {
+      const id = state.board[y][x];
+      if (!id) continue;
+      const piece = state.pieces.get(id);
+      if (piece.color !== color) continue;
+      
+      const dist = Math.abs(x - flagX) + Math.abs(y - flagY);
+      if (dist <= 2 && dist > 0) {
+        count++;
+      }
+    }
+  }
+  return count;
 }
 
 function updateAiControls() {
@@ -905,7 +1143,8 @@ nameInput.value = localStorage.getItem('name') || '';
 flipBoardSelect.value = localStorage.getItem('flipBoard') || 'off';
 flipBoardForBlack = flipBoardSelect.value === 'on';
 opponentSelect.value = localStorage.getItem('opponent') || 'human';
-aiEnabled = opponentSelect.value === 'ai';
+aiEnabled = opponentSelect.value.startsWith('ai');
+aiStrength = opponentSelect.value === 'ai-minimax' ? 'minimax' : 'random';
 
 serverInput.addEventListener('change', () => localStorage.setItem('server', serverInput.value));
 nameInput.addEventListener('change', () => localStorage.setItem('name', nameInput.value));
@@ -917,7 +1156,8 @@ flipBoardSelect.addEventListener('change', () => {
 
 opponentSelect.addEventListener('change', () => {
   localStorage.setItem('opponent', opponentSelect.value);
-  aiEnabled = opponentSelect.value === 'ai';
+  aiEnabled = opponentSelect.value.startsWith('ai');
+  aiStrength = opponentSelect.value === 'ai-minimax' ? 'minimax' : 'random';
 });
 
 aiRerollBtn.addEventListener('click', () => {
