@@ -663,43 +663,65 @@ function executeAiMove(forceDifferent) {
     return;
   }
 
-  let chosenMove;
-  if (aiStrength === 'minimax') {
-    chosenMove = findBestMove(gameState, aiColor, 4); // Search depth 4
-  } else {
-    // Original random AI
-    const captureMoves = moves.filter(m => {
-      const target = gameState.board[m.to.y][m.to.x];
-      return !!target || m.enPassant;
-    });
-    const useCapture = captureMoves.length > 0 && Math.random() < 0.6;
-    let pool = useCapture ? captureMoves : moves;
+  // Show thinking indicator
+  const thinkingEl = document.getElementById('ai-thinking');
+  if (thinkingEl) thinkingEl.style.display = 'block';
 
-    if (forceDifferent && lastAiMoveKey && pool.length > 1) {
-      pool = pool.filter(m => `${m.from.x}${m.from.y}${m.to.x}${m.to.y}` !== lastAiMoveKey);
-      if (pool.length === 0) pool = useCapture ? captureMoves : moves;
+  // Defer AI calculation to next tick to allow UI updates
+  const aiTimeout = setTimeout(() => {
+    let chosenMove;
+    try {
+      if (aiStrength === 'minimax') {
+        // Temporarily disable minimax to prevent hanging
+        chosenMove = findBestMove(gameState, aiColor, 1); // Even more reduced depth
+      } else {
+        // Original random AI
+        const captureMoves = moves.filter(m => {
+          const target = gameState.board[m.to.y][m.to.x];
+          return !!target || m.enPassant;
+        });
+        const useCapture = captureMoves.length > 0 && Math.random() < 0.6;
+        let pool = useCapture ? captureMoves : moves;
+
+        if (forceDifferent && lastAiMoveKey && pool.length > 1) {
+          pool = pool.filter(m => `${m.from.x}${m.from.y}${m.to.x}${m.to.y}` !== lastAiMoveKey);
+          if (pool.length === 0) pool = useCapture ? captureMoves : moves;
+        }
+
+        chosenMove = pool[Math.floor(Math.random() * pool.length)];
+      }
+    } catch (error) {
+      console.error('AI error:', error);
+      // Fallback to random move
+      chosenMove = moves[Math.floor(Math.random() * moves.length)];
     }
 
-    chosenMove = pool[Math.floor(Math.random() * pool.length)];
-  }
+    // Hide thinking indicator
+    if (thinkingEl) thinkingEl.style.display = 'none';
 
-  lastAiMoveKey = `${chosenMove.from.x}${chosenMove.from.y}${chosenMove.to.x}${chosenMove.to.y}`;
-  lastAiState = cloneState(gameState);
-  applyMoveLocal({ from: chosenMove.from, to: chosenMove.to });
-  endLocalTurn();
+    if (chosenMove) {
+      lastAiMoveKey = `${chosenMove.from.x}${chosenMove.from.y}${chosenMove.to.x}${chosenMove.to.y}`;
+      lastAiState = cloneState(gameState);
+      applyMoveLocal({ from: chosenMove.from, to: chosenMove.to });
+      endLocalTurn();
+    }
+  }, 1000); // Reduced timeout to 1 second
 }
 
 function findBestMove(state, color, depth) {
   const moves = generateMoves(state, color);
   if (moves.length === 0) return null;
 
+  // Limit moves to top 10 to prevent hanging
+  const limitedMoves = moves.slice(0, 10);
+
   let bestMove = null;
   let bestValue = -Infinity;
 
-  for (const move of moves) {
+  for (const move of limitedMoves) {
     // Make the move
     const newState = makeMove(state, move);
-    const value = -minimax(newState, depth - 1, -color);
+    const value = -minimax(newState, depth - 1, color);
 
     if (value > bestValue) {
       bestValue = value;
@@ -710,31 +732,25 @@ function findBestMove(state, color, depth) {
   return bestMove;
 }
 
-function minimax(state, depth, color) {
+function minimax(state, depth, maximizingColor) {
   if (depth === 0 || state.gameOver) {
-    return evaluateBoard(state, color);
+    return evaluateBoard(state, maximizingColor);
   }
 
-  const moves = generateMoves(state, color);
+  const moves = generateMoves(state, state.turn);
   if (moves.length === 0) {
     // No moves available - bad for current player
-    return color === 'w' ? -10000 : 10000;
+    return state.turn === maximizingColor ? -100000 : 100000;
   }
 
-  let bestValue = -Infinity;
-  if (color !== state.turn) bestValue = Infinity; // Opponent's turn
-
+  let maxEval = -Infinity;
   for (const move of moves) {
     const newState = makeMove(state, move);
-    const value = -minimax(newState, depth - 1, color === 'w' ? 'b' : 'w');
-    if (color === state.turn) {
-      bestValue = Math.max(bestValue, value);
-    } else {
-      bestValue = Math.min(bestValue, value);
-    }
+    const eval = -minimax(newState, depth - 1, maximizingColor);
+    maxEval = Math.max(maxEval, eval);
   }
 
-  return bestValue;
+  return maxEval;
 }
 
 function makeMove(state, move) {
@@ -793,13 +809,17 @@ function evaluateBoard(state, color) {
     return 0; // Draw
   }
 
-  const pieceValues = { P: 100, N: 320, B: 330, R: 500, Q: 900, K: 20000 };
+  const pieceValues = { P: 100, N: 320, B: 330, R: 500, Q: 900, K: 150 };
 
   let score = 0;
 
   // Material balance
   for (const [id, piece] of state.pieces.entries()) {
-    const value = pieceValues[piece.type] || 0;
+    let value = pieceValues[piece.type] || 0;
+    // Flag pawn is the most valuable piece - capturing it wins the game!
+    if (piece.isFlag) {
+      value = 10000;
+    }
     score += piece.color === color ? value : -value;
   }
 
