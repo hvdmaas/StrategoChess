@@ -21,6 +21,26 @@ const overlayEl = document.getElementById('overlay');
 const overlayTitle = document.getElementById('overlay-title');
 const overlayText = document.getElementById('overlay-text');
 const overlayBtn = document.getElementById('overlay-btn');
+// optional controls that may not exist in the current UI
+const createBtn = document.getElementById('create');
+const roomInput = document.getElementById('room');
+
+// challenge UI elements (online mode only)
+const challengeCreate = document.getElementById('challenge-create');
+const createChallengeBtn = document.getElementById('create-challenge');
+const refreshChallengesBtn = document.getElementById('refresh-challenges');
+const myChallengesBtn = document.getElementById('my-challenges');
+const backToListBtn = document.getElementById('back-to-list');
+const challengeListContainer = document.getElementById('challenge-list-container');
+const myChallengesContainer = document.getElementById('my-challenges-container');
+const challengeList = document.getElementById('challenge-list');
+const myChallengesList = document.getElementById('my-challenges-list');
+
+// flag confirmation overlay
+const flagConfirmOverlay = document.getElementById('flag-confirm-overlay');
+const flagConfirmYes = document.getElementById('flag-confirm-yes');
+const flagConfirmNo = document.getElementById('flag-confirm-no');
+
 let challenges = [];
 
 let ws = null;
@@ -62,7 +82,7 @@ function getDefaultServer() {
 
 function connect() {
   const server = serverInput.value.trim();
-  const room = roomInput.value.trim();
+  const room = roomInput ? roomInput.value.trim() : '';
   const name = nameInput.value.trim() || 'Player';
 
   if (!server || !room) {
@@ -1132,25 +1152,29 @@ function applyClockSettings() {
   }
 }
 
-createBtn.addEventListener('click', () => {
-  if (createBtn.disabled) return;
-  createBtn.disabled = true;
-  roomInput.value = randomRoom();
-  connect();
-  setTimeout(() => createBtn.disabled = false, 3000);
-});
+if (createBtn) {
+  createBtn.addEventListener('click', () => {
+    if (createBtn.disabled) return;
+    createBtn.disabled = true;
+    if (roomInput) {
+      roomInput.value = randomRoom();
+    }
+    connect();
+    setTimeout(() => createBtn.disabled = false, 3000);
+  });
+}
 
 clockApplyBtn.addEventListener('click', () => applyClockSettings());
 
 // Challenge system event listeners
-createChallengeBtn.addEventListener('click', () => createChallenge());
-refreshChallengesBtn.addEventListener('click', () => loadChallenges());
-myChallengesBtn.addEventListener('click', () => showMyChallenges());
-backToListBtn.addEventListener('click', () => showChallengeList());
+if (createChallengeBtn) createChallengeBtn.addEventListener('click', () => createChallenge());
+if (refreshChallengesBtn) refreshChallengesBtn.addEventListener('click', () => loadChallenges());
+if (myChallengesBtn) myChallengesBtn.addEventListener('click', () => showMyChallenges());
+if (backToListBtn) backToListBtn.addEventListener('click', () => showChallengeList());
 
 // Flag confirmation
-flagConfirmYes.addEventListener('click', () => confirmFlag());
-flagConfirmNo.addEventListener('click', () => cancelFlagConfirmation());
+if (flagConfirmYes) flagConfirmYes.addEventListener('click', () => confirmFlag());
+if (flagConfirmNo) flagConfirmNo.addEventListener('click', () => cancelFlagConfirmation());
 
 serverInput.value = localStorage.getItem('server') || getDefaultServer();
 serverInput.addEventListener('change', () => localStorage.setItem('server', serverInput.value));
