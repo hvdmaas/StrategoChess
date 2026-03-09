@@ -1,10 +1,5 @@
 const serverInput = document.getElementById('server');
 const nameInput = document.getElementById('name');
-const roomInput = document.getElementById('room');
-const createBtn = document.getElementById('create');
-const joinBtn = document.getElementById('join');
-const localStartBtn = document.getElementById('local-start');
-const modeSelect = document.getElementById('mode');
 const boardEl = document.getElementById('board');
 const statusEl = document.getElementById('status');
 const logEl = document.getElementById('log');
@@ -17,19 +12,16 @@ const clockMinInput = document.getElementById('clock-min');
 const clockIncInput = document.getElementById('clock-inc');
 const clockApplyBtn = document.getElementById('clock-apply');
 const flipBoardSelect = document.getElementById('flip-board');
-const opponentSelect = document.getElementById('opponent');
-const aiRerollBtn = document.getElementById('ai-reroll');
-const puzzleSelect = document.getElementById('puzzle');
-const puzzleStartBtn = document.getElementById('puzzle-start');
-const overlayEl = document.getElementById('overlay');
-const overlayTitle = document.getElementById('overlay-title');
-const overlayText = document.getElementById('overlay-text');
-const overlayBtn = document.getElementById('overlay-btn');
 const moveListEl = document.getElementById('move-list');
 const resignBtn = document.getElementById('resign');
 const offerDrawBtn = document.getElementById('offer-draw');
 const acceptDrawBtn = document.getElementById('accept-draw');
 const declineDrawBtn = document.getElementById('decline-draw');
+const overlayEl = document.getElementById('overlay');
+const overlayTitle = document.getElementById('overlay-title');
+const overlayText = document.getElementById('overlay-text');
+const overlayBtn = document.getElementById('overlay-btn');
+let challenges = [];
 
 let ws = null;
 let playerColor = null;
@@ -38,20 +30,6 @@ let selected = null;
 let localMode = false;
 let localView = 'w';
 let localOverlayLocked = false;
-let localTick = null;
-let lastGameOver = false;
-let localClockBaseMs = 5 * 60 * 1000;
-let localClockIncrementMs = 0;
-let flipBoardForBlack = true;
-let myFlagId = null;
-let aiEnabled = false;
-const aiColor = 'b';
-let aiPendingTimeout = null;
-let lastAiMoveKey = null;
-let lastAiState = null;
-let aiStrength = 'random'; // 'random' or 'minimax'
-let puzzleMode = false;
-let puzzlePlayerColor = 'w';
 
 const PIECES = {
   w: { K: '♔', Q: '♕', R: '♖', B: '♗', N: '♘', P: '♙' },
@@ -79,7 +57,7 @@ function randomRoom() {
 }
 
 function getDefaultServer() {
-  return 'ws://localhost:8787';
+  return 'wss://strategochess.onrender.com';
 }
 
 function connect() {
@@ -170,11 +148,7 @@ function render() {
   renderBoard();
   updateInstructions();
   updateMoveList();
-  updateAiControls();
   updateActionButtons();
-  if (localMode && aiEnabled && gameState.running && !gameState.gameOver && gameState.turn === aiColor && !aiPendingTimeout) {
-    maybeAiMove();
-  }
 }
 
 function updateClocks() {
@@ -468,12 +442,24 @@ function chooseFlagLocal(color, x, y) {
   const piece = gameState.pieces.get(id);
   if (piece.color !== color || piece.type !== 'P') return;
 
-  if (gameState.flags[color] && gameState.flags[color] !== id) {
+  // Clear previous flag highlight
+  if (gameState.flags[color]) {
     const oldFlag = gameState.pieces.get(gameState.flags[color]);
     if (oldFlag) oldFlag.isFlag = false;
   }
+  
+  // Temporarily set as flag and show confirmation
   piece.isFlag = true;
   gameState.flags[color] = id;
+  myFlagId = id;
+  
+  render();
+  showFlagConfirmation();
+}
+
+function confirmFlagSelection(color) {
+  flagConfirmationNeeded = false;
+  selectedFlagForConfirmation = null;
   gameState.playersReady[color] = true;
 
   // If AI is enabled and this is the human choosing white flag, let AI choose black flag
@@ -493,6 +479,17 @@ function chooseFlagLocal(color, x, y) {
       showOverlay(`${localView === 'w' ? 'White' : 'Black'} player`, 'Choose your flag pawn.', `I am ${localView === 'w' ? 'White' : 'Black'}`);
     }
   }
+  render();
+}
+
+function cancelFlagSelection(color) {
+  // Remove the flag marking
+  const piece = gameState.pieces.get(gameState.flags[color]);
+  if (piece) piece.isFlag = false;
+  gameState.flags[color] = null;
+  myFlagId = null;
+  flagConfirmationNeeded = false;
+  selectedFlagForConfirmation = null;
   render();
 }
 
@@ -1099,17 +1096,12 @@ function generateKingMoves(state, moves, x, y, piece) {
 }
 
 function updateModeUI() {
-  const online = modeSelect.value === 'online';
-  serverInput.disabled = !online;
-  roomInput.disabled = !online;
-  createBtn.disabled = !online;
-  joinBtn.disabled = !online;
-  localStartBtn.disabled = online;
-  opponentSelect.disabled = online;
-  puzzleSelect.disabled = online;
-  puzzleStartBtn.disabled = online;
-  if (aiRerollBtn) aiRerollBtn.disabled = true;
-  setStatus(online ? 'Disconnected' : 'Offline');
+  // Online-only mode - always show challenge UI
+  challengeCreate.style.display = 'block';
+  challengeListContainer.style.display = 'block';
+  myChallengesContainer.style.display = 'none';
+  setStatus('Disconnected');
+  loadChallenges();
 }
 
 
@@ -1147,77 +1139,33 @@ createBtn.addEventListener('click', () => {
   setTimeout(() => createBtn.disabled = false, 3000);
 });
 
-joinBtn.addEventListener('click', () => {
-  if (joinBtn.disabled) return;
-  joinBtn.disabled = true;
-  connect();
-  setTimeout(() => joinBtn.disabled = false, 3000);
-});
-localStartBtn.addEventListener('click', () => startLocalGame());
 clockApplyBtn.addEventListener('click', () => applyClockSettings());
 
-modeSelect.addEventListener('change', () => updateModeUI());
+// Challenge system event listeners
+createChallengeBtn.addEventListener('click', () => createChallenge());
+refreshChallengesBtn.addEventListener('click', () => loadChallenges());
+myChallengesBtn.addEventListener('click', () => showMyChallenges());
+backToListBtn.addEventListener('click', () => showChallengeList());
+
+// Flag confirmation
+flagConfirmYes.addEventListener('click', () => confirmFlag());
+flagConfirmNo.addEventListener('click', () => cancelFlagConfirmation());
 
 serverInput.value = localStorage.getItem('server') || getDefaultServer();
-nameInput.value = localStorage.getItem('name') || '';
-flipBoardSelect.value = localStorage.getItem('flipBoard') || 'off';
-flipBoardForBlack = flipBoardSelect.value === 'on';
-opponentSelect.value = localStorage.getItem('opponent') || 'human';
-aiEnabled = opponentSelect.value.startsWith('ai');
-aiStrength = opponentSelect.value === 'ai-minimax' ? 'minimax' : 'random';
-
 serverInput.addEventListener('change', () => localStorage.setItem('server', serverInput.value));
 nameInput.addEventListener('change', () => localStorage.setItem('name', nameInput.value));
 flipBoardSelect.addEventListener('change', () => {
   localStorage.setItem('flipBoard', flipBoardSelect.value);
-  flipBoardForBlack = flipBoardSelect.value === 'on';
   renderBoard();
-});
-
-opponentSelect.addEventListener('change', () => {
-  localStorage.setItem('opponent', opponentSelect.value);
-  aiEnabled = opponentSelect.value.startsWith('ai');
-  aiStrength = opponentSelect.value === 'ai-minimax' ? 'minimax' : 'random';
-});
-
-aiRerollBtn.addEventListener('click', () => {
-  if (aiPendingTimeout) {
-    clearTimeout(aiPendingTimeout);
-    aiPendingTimeout = null;
-  }
-  if (lastAiState) {
-    gameState = cloneState(lastAiState);
-    lastAiState = null;
-    render();
-    executeAiMove(true);
-  } else {
-    executeAiMove(true);
-  }
 });
 
 resignBtn.addEventListener('click', () => {
   if (!gameState || gameState.gameOver) return;
-  if (localMode) {
-    gameState.gameOver = true;
-    gameState.running = false;
-    gameState.winner = gameState.turn === 'w' ? 'b' : 'w';
-    gameState.reason = 'resign';
-    render();
-    return;
-  }
   send({ type: 'resign' });
 });
 
 offerDrawBtn.addEventListener('click', () => {
   if (!gameState || gameState.gameOver) return;
-  if (localMode) {
-    gameState.drawOfferedBy = gameState.turn;
-    log(`${gameState.turn === 'w' ? 'White' : 'Black'} offered a draw.`);
-    // Switch view to the other player so they can respond
-    localView = gameState.turn === 'w' ? 'b' : 'w';
-    render();
-    return;
-  }
   send({ type: 'offer_draw' });
   // Immediately update UI to show draw was offered
   if (gameState) {
@@ -1228,34 +1176,195 @@ offerDrawBtn.addEventListener('click', () => {
 
 acceptDrawBtn.addEventListener('click', () => {
   if (!gameState || gameState.gameOver) return;
-  if (localMode) {
-    if (gameState.drawOfferedBy && gameState.drawOfferedBy !== gameState.turn) {
-      gameState.gameOver = true;
-      gameState.running = false;
-      gameState.winner = null;
-      gameState.reason = 'draw';
-      gameState.drawOfferedBy = null;
-      render();
-    }
-    return;
-  }
   send({ type: 'accept_draw' });
 });
 
 declineDrawBtn.addEventListener('click', () => {
   if (!gameState || gameState.gameOver) return;
-  if (localMode) {
-    if (gameState.drawOfferedBy && gameState.drawOfferedBy !== gameState.turn) {
-      gameState.drawOfferedBy = null;
-      log('Draw declined.');
-      // Switch view back to the current turn player
-      localView = gameState.turn;
-      render();
-    }
-    return;
-  }
   send({ type: 'decline_draw' });
 });
+
+// Challenge System Functions
+async function loadChallenges() {
+  try {
+    const server = serverInput.value.trim();
+    if (!server) {
+      log('Enter server URL first');
+      return;
+    }
+    
+    const response = await fetch(`${server.replace(/^wss?/, 'https')}/api/challenges`);
+    const data = await response.json();
+    challenges = data || [];
+    displayChallenges();
+  } catch (error) {
+    console.error('Failed to load challenges:', error);
+    log('Failed to load challenges');
+  }
+}
+
+function displayChallenges() {
+  challengeList.innerHTML = '';
+  
+  if (challenges.length === 0) {
+    challengeList.innerHTML = '<p style="text-align: center; color: #999;">No challenges available</p>';
+    return;
+  }
+  
+  challenges.forEach(challenge => {
+    const div = document.createElement('div');
+    div.style.cssText = 'padding: 8px; margin: 5px 0; background: #f0f0f0; border-radius: 4px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;';
+    div.innerHTML = `
+      <span><strong>${challenge.creatorName}</strong> - ${challenge.timeControl.minutes}+${challenge.timeControl.increment}</span>
+      <button style="padding: 4px 12px; cursor: pointer;">Join</button>
+    `;
+    div.querySelector('button').onclick = () => joinChallenge(challenge.id);
+    challengeList.appendChild(div);
+  });
+}
+
+async function createChallenge() {
+  const playerName = nameInput.value.trim() || 'Player';
+  const minutes = parseInt(challengeTimeInput.value) || 5;
+  const increment = parseInt(challengeIncrementInput.value) || 0;
+  
+  try {
+    const server = serverInput.value.trim();
+    const response = await fetch(`${server.replace(/^wss?/, 'https')}/api/challenges`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        creatorName: playerName,
+        timeControl: { minutes, increment }
+      })
+    });
+    
+    const data = await response.json();
+    if (data.success) {
+      log(`Challenge created! Room: ${data.room}`);
+      roomInput = document.createElement('input');
+      roomInput.value = data.room;
+      connectWithRoom(data.room);
+    } else {
+      log('Failed to create challenge');
+    }
+  } catch (error) {
+    console.error('Failed to create challenge:', error);
+    log('Failed to create challenge');
+  }
+}
+
+async function joinChallenge(challengeId) {
+  try {
+    const server = serverInput.value.trim();
+    const response = await fetch(`${server.replace(/^wss?/, 'https')}/api/challenges/${challengeId}/join`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerName: nameInput.value.trim() || 'Player' })
+    });
+    
+    const data = await response.json();
+    if (data.success) {
+      log(`Joined challenge! Room: ${data.room}`);
+      roomInput = document.createElement('input');
+      roomInput.value = data.room;
+      connectWithRoom(data.room);
+    } else {
+      log('Failed to join challenge');
+    }
+  } catch (error) {
+    console.error('Failed to join challenge:', error);
+    log('Failed to join challenge');
+  }
+}
+
+async function deleteChallenge(challengeId) {
+  try {
+    const server = serverInput.value.trim();
+    const response = await fetch(`${server.replace(/^wss?/, 'https')}/api/challenges/${challengeId}`, {
+      method: 'DELETE'
+    });
+    
+    const data = await response.json();
+    if (data.success) {
+      log('Challenge deleted');
+      loadChallenges();
+    }
+  } catch (error) {
+    console.error('Failed to delete challenge:', error);
+  }
+}
+
+async function showMyChallenges() {
+  challengeListContainer.style.display = 'none';
+  myChallengesContainer.style.display = 'block';
+  
+  const myName = nameInput.value.trim() || 'Player';
+  const myChallenges = challenges.filter(c => c.creatorName === myName);
+  
+  myChallengesList.innerHTML = '';
+  if (myChallenges.length === 0) {
+    myChallengesList.innerHTML = '<p style="text-align: center; color: #999;">No challenges created</p>';
+    return;
+  }
+  
+  myChallenges.forEach(challenge => {
+    const div = document.createElement('div');
+    div.style.cssText = 'padding: 8px; margin: 5px 0; background: #fff3cd; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;';
+    div.innerHTML = `
+      <span>${challenge.timeControl.minutes}+${challenge.timeControl.increment}</span>
+      <button style="padding: 4px 12px; cursor: pointer; background: #dc3545; color: white; border: none; border-radius: 3px;">Delete</button>
+    `;
+    div.querySelector('button').onclick = () => deleteChallenge(challenge.id);
+    myChallengesList.appendChild(div);
+  });
+}
+
+function showChallengeList() {
+  challengeListContainer.style.display = 'block';
+  myChallengesContainer.style.display = 'none';
+  loadChallenges();
+}
+
+function connectWithRoom(room) {
+  const server = serverInput.value.trim();
+  const name = nameInput.value.trim() || 'Player';
+  
+  if (!server || !room) return;
+  
+  localMode = false;
+  overlayHide();
+  aiEnabled = false;
+  
+  if (ws) ws.close();
+  ws = new WebSocket(server);
+  ws.onopen = () => {
+    setStatus('Connecting...');
+    send({ type: 'join', room, playerId: generatePlayerId(), name });
+  };
+  ws.onmessage = onWsMessage;
+  ws.onclose = () => setStatus('Disconnected');
+  ws.onerror = () => log('Connection error');
+}
+
+function generatePlayerId() {
+  return 'player_' + Math.random().toString(36).substr(2, 9);
+}
+
+// Flag Confirmation
+function showFlagConfirmation() {
+  flagConfirmOverlay.classList.remove('hidden');
+}
+
+function confirmFlag() {
+  flagConfirmOverlay.classList.add('hidden');
+  confirmFlagSelection(localView);
+}
+
+function cancelFlagConfirmation() {
+  flagConfirmOverlay.classList.add('hidden');
+  cancelFlagSelection(localView);
+}
 
 puzzleStartBtn.addEventListener('click', () => {
   const key = puzzleSelect.value;

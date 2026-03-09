@@ -33,14 +33,52 @@
         <input id="name" type="text" placeholder="Player name" />
       </div>
       <div class="field">
-        <label for="room">Room</label>
-        <input id="room" type="number" placeholder="1234" min="1000" max="9999" />
+        <label for="mode">Mode</label>
+        <select id="mode">
+          <option value="online">Online</option>
+          <option value="local">Offline</option>
+        </select>
       </div>
-      <div class="actions">
-        <button id="create">Create Room</button>
-        <button id="join">Join Room</button>
-        <button id="local-start">Start Local Game</button>
+      <div class="field">
+        <label for="server">Server URL</label>
+        <input id="server" type="text" placeholder="wss://strategochess.onrender.com" />
       </div>
+      <div class="field">
+        <label for="name">Name</label>
+        <input id="name" type="text" placeholder="Player name" />
+      </div>
+      
+      <!-- Challenge Creation -->
+      <div id="challenge-create" class="field" style="display:none;">
+        <label for="challenge-time">Time Control (minutes)</label>
+        <input id="challenge-time" type="number" min="1" max="60" value="5" />
+        <label for="challenge-increment">Increment (seconds)</label>
+        <input id="challenge-increment" type="number" min="0" max="30" value="0" />
+        <div class="actions">
+          <button id="create-challenge">Create Challenge</button>
+        </div>
+      </div>
+
+      <!-- Challenge List -->
+      <div id="challenge-list-container" style="display:none; margin-top: 15px;">
+        <h3>Available Challenges</h3>
+        <div id="challenge-list" style="max-height: 200px; overflow-y: auto; border: 1px solid #ccc; border-radius: 4px; padding: 8px;"></div>
+        <div class="actions" style="margin-top: 10px;">
+          <button id="refresh-challenges">Refresh</button>
+          <button id="my-challenges">My Challenges</button>
+        </div>
+      </div>
+
+      <!-- My Challenges -->
+      <div id="my-challenges-container" style="display:none; margin-top: 15px;">
+        <h3>My Challenges</h3>
+        <div id="my-challenges-list" style="max-height: 150px; overflow-y: auto; border: 1px solid #ccc; border-radius: 4px; padding: 8px;"></div>
+        <div class="actions" style="margin-top: 10px;">
+          <button id="back-to-list">Back to Challenges</button>
+        </div>
+      </div>
+
+
     </div>
   </section>
 
@@ -98,33 +136,7 @@
           </select>
         </div>
       </div>
-      <div class="card" id="opponent-settings">
-        <h3>Opponent (Local)</h3>
-        <div class="field">
-          <label for="opponent">Opponent</label>
-          <select id="opponent">
-            <option value="human" selected>Human</option>
-            <option value="ai-random">Computer (Random)</option>
-            <option value="ai-minimax">Computer (Smart)</option>
-          </select>
-        </div>
-      </div>
-      <div class="card" id="puzzle-settings">
-        <h3>Puzzles</h3>
-        <div class="field">
-          <label for="puzzle">Select Puzzle</label>
-          <select id="puzzle">
-            <option value="">None</option>
-            <option value="p1">Puzzle 1: Ra1/a5 vs Ra8/a7 (White to move)</option>
-            <option value="p2">Puzzle 2: White e2 vs Black d7 (White to move)</option>
-            <option value="p3">Puzzle 3: White e2,d2 vs Black d7,e7 (Black to move)</option>
-            <option value="p4">Puzzle 4: White c2,d2,e2 vs Black c7,d7,e7 (White to move)</option>
-          </select>
-        </div>
-        <div class="actions">
-          <button id="puzzle-start">Start Puzzle</button>
-        </div>
-      </div>
+
       <div class="card" id="computer-controls">
         <h3>Computer</h3>
         <div id="ai-thinking" style="display: none; color: #666; font-style: italic; margin-bottom: 10px;">Thinking...</div>
@@ -166,6 +178,17 @@
       <div id="overlay-title" class="overlay-title">Pass Device</div>
       <div id="overlay-text" class="overlay-text">Hand the device to the next player.</div>
       <button id="overlay-btn">I am ready</button>
+    </div>
+  </div>
+
+  <div id="flag-confirm-overlay" class="overlay hidden">
+    <div class="overlay-card">
+      <div class="overlay-title">Confirm Flag Selection</div>
+      <div class="overlay-text">Is this the pawn you want as your flag? You can click another pawn to change.</div>
+      <div class="actions" style="margin-top: 15px;">
+        <button id="flag-confirm-yes">Confirm Flag</button>
+        <button id="flag-confirm-no">Choose Different</button>
+      </div>
     </div>
   </div>
 

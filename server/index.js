@@ -1,13 +1,80 @@
 import http from 'http';
 import crypto from 'crypto';
 import { WebSocketServer } from 'ws';
+import url from 'url';
 
 const PORT = process.env.PORT || 8787;
 const START_CLOCK_MS = 5 * 60 * 1000;
 
+const challenges = [];
+
 const server = http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end('Stratego Chess server\n');
+  const parsedUrl = url.parse(req.url, true);
+  const pathname = parsedUrl.pathname;
+  const query = parsedUrl.query;
+  
+  // Enable CORS
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  
+  if (req.method === 'OPTIONS') {
+    res.writeHead(200);
+    res.end();
+    return;
+  }
+  
+  if (pathname === '/api/challenges' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(challenges));
+  } else if (pathname === '/api/challenges' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      try {
+        const data = JSON.parse(body);
+        const challenge = {
+          id: makeId(),
+          creatorName: data.creatorName || 'Player',
+          timeControl: data.timeControl || { minutes: 5, increment: 0 },
+          room: String(Math.floor(Math.random() * 9000) + 1000),
+          createdAt: Date.now()
+        };
+        challenges.push(challenge);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, ...challenge }));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false }));
+      }
+    });
+  } else if (pathname.match(/^\/api\/challenges\/[a-f0-9]+\/join$/) && req.method === 'POST') {
+    const challengeId = pathname.split('/')[3];
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      try {
+        const challenge = challenges.find(c => c.id === challengeId);
+        if (!challenge) throw new Error('Challenge not found');
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, room: challenge.room }));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false }));
+      }
+    });
+  } else if (pathname.match(/^\/api\/challenges\/[a-f0-9]+$/) && req.method === 'DELETE') {
+    const challengeId = pathname.split('/')[3];
+    const idx = challenges.findIndex(c => c.id === challengeId);
+    if (idx >= 0) {
+      challenges.splice(idx, 1);
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true }));
+  } else {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('Stratego Chess server\n');
+  }
 });
 
 const wss = new WebSocketServer({ server });
