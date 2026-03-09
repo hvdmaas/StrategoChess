@@ -1353,7 +1353,7 @@ function connectWithRoom(room) {
   if (ws) ws.close();
   ws = new WebSocket(server);
   ws.onopen = () => {
-    setStatus('Connecting...');
+    setStatus('Connected');
     send({ type: 'join', room, playerId: generatePlayerId(), name });
   };
   ws.onmessage = onWsMessage;
