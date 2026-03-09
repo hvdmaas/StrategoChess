@@ -1189,17 +1189,20 @@ async function loadChallenges() {
   try {
     const server = serverInput.value.trim();
     if (!server) {
-      log('Enter server URL first');
+      log('Server URL not set');
+      challengeList.innerHTML = '<p style="text-align: center; color: #999;">Enter server URL first</p>';
       return;
     }
     
-    const response = await fetch(`${server.replace(/^wss?/, 'https')}/api/challenges`);
+    const apiUrl = `${server.replace(/^wss?/, 'https')}/api/challenges`;
+    const response = await fetch(apiUrl);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
     challenges = data || [];
     displayChallenges();
   } catch (error) {
     console.error('Failed to load challenges:', error);
-    log('Failed to load challenges');
+    challengeList.innerHTML = `<p style="text-align: center; color: #999;">Unable to load challenges. Try refreshing.</p>`;
   }
 }
 
@@ -1230,7 +1233,13 @@ async function createChallenge() {
   
   try {
     const server = serverInput.value.trim();
-    const response = await fetch(`${server.replace(/^wss?/, 'https')}/api/challenges`, {
+    if (!server) {
+      log('Server URL not set');
+      return;
+    }
+    
+    const apiUrl = `${server.replace(/^wss?/, 'https')}/api/challenges`;
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1239,18 +1248,17 @@ async function createChallenge() {
       })
     });
     
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
     if (data.success) {
       log(`Challenge created! Room: ${data.room}`);
-      roomInput = document.createElement('input');
-      roomInput.value = data.room;
       connectWithRoom(data.room);
     } else {
       log('Failed to create challenge');
     }
   } catch (error) {
     console.error('Failed to create challenge:', error);
-    log('Failed to create challenge');
+    log('Failed to create challenge: ' + error.message);
   }
 }
 

@@ -27,7 +27,7 @@
       </div>
       
       <!-- Challenge Creation -->
-      <div id="challenge-create" class="field" style="display:none;">
+      <div id="challenge-create" class="field" style="display:block; margin-top: 15px;">
         <label for="challenge-time">Time Control (minutes)</label>
         <input id="challenge-time" type="number" min="1" max="60" value="5" />
         <label for="challenge-increment">Increment (seconds)</label>
@@ -38,9 +38,9 @@
       </div>
 
       <!-- Challenge List -->
-      <div id="challenge-list-container" style="display:none; margin-top: 15px;">
+      <div id="challenge-list-container" style="display:block; margin-top: 15px;">
         <h3>Available Challenges</h3>
-        <div id="challenge-list" style="max-height: 200px; overflow-y: auto; border: 1px solid #ccc; border-radius: 4px; padding: 8px;"></div>
+        <div id="challenge-list" style="max-height: 200px; overflow-y: auto; border: 1px solid #ccc; border-radius: 4px; padding: 8px;"><p style="text-align: center; color: #999;">Loading...</p></div>
         <div class="actions" style="margin-top: 10px;">
           <button id="refresh-challenges">Refresh</button>
           <button id="my-challenges">My Challenges</button>
