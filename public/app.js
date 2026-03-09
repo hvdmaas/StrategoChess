@@ -1239,6 +1239,11 @@ async function loadChallenges() {
 
 function displayChallenges() {
   console.log('displayChallenges', challenges);
+  if (!challengeList) {
+    console.error('challengeList element not found');
+    return;
+  }
+  
   challengeList.innerHTML = '';
   
   if (challenges.length === 0) {
@@ -1246,11 +1251,17 @@ function displayChallenges() {
     return;
   }
   
-  challenges.forEach(challenge => {
+  challenges.forEach((challenge, idx) => {
+    console.log('Rendering challenge', idx, challenge);
     const div = document.createElement('div');
     div.style.cssText = 'padding: 8px; margin: 5px 0; background: #f0f0f0; border-radius: 4px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;';
+    
+    const creatorName = challenge.creatorName || 'Unknown';
+    const minutes = challenge.timeControl?.minutes ?? 5;
+    const increment = challenge.timeControl?.increment ?? 0;
+    
     div.innerHTML = `
-      <span><strong>${challenge.creatorName}</strong> - ${challenge.timeControl.minutes}+${challenge.timeControl.increment}</span>
+      <span><strong>${creatorName}</strong> - ${minutes}+${increment}</span>
       <button style="padding: 4px 12px; cursor: pointer;">Join</button>
     `;
     div.querySelector('button').onclick = () => joinChallenge(challenge.id);
