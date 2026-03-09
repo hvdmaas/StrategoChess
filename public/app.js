@@ -28,6 +28,8 @@ const roomInput = document.getElementById('room');
 // challenge UI elements (online mode only)
 const challengeCreate = document.getElementById('challenge-create');
 const createChallengeBtn = document.getElementById('create-challenge');
+const challengeTimeInput = document.getElementById('challenge-time');
+const challengeIncrementInput = document.getElementById('challenge-increment');
 const refreshChallengesBtn = document.getElementById('refresh-challenges');
 const myChallengesBtn = document.getElementById('my-challenges');
 const backToListBtn = document.getElementById('back-to-list');
@@ -1258,17 +1260,19 @@ function displayChallenges() {
 
 async function createChallenge() {
   const playerName = nameInput.value.trim() || 'Player';
-  const minutes = parseInt(challengeTimeInput.value) || 5;
-  const increment = parseInt(challengeIncrementInput.value) || 0;
+  const minutes = challengeTimeInput ? parseInt(challengeTimeInput.value) || 5 : 5;
+  const increment = challengeIncrementInput ? parseInt(challengeIncrementInput.value) || 0 : 0;
   
   try {
     const server = serverInput.value.trim();
+    console.log('createChallenge serverInput', server);
     if (!server) {
       log('Server URL not set');
       return;
     }
     
     const apiUrl = `${server.replace(/^wss?/, 'https')}/api/challenges`;
+    console.log('createChallenge POST', apiUrl, { creatorName: playerName, timeControl: { minutes, increment } });
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1280,6 +1284,7 @@ async function createChallenge() {
     
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
+    console.log('createChallenge response', data);
     if (data.success) {
       log(`Challenge created! Room: ${data.room}`);
       connectWithRoom(data.room);
@@ -1295,6 +1300,7 @@ async function createChallenge() {
 async function joinChallenge(challengeId) {
   try {
     const server = serverInput.value.trim();
+    console.log('joinChallenge serverInput', server, 'id', challengeId);
     const response = await fetch(`${server.replace(/^wss?/, 'https')}/api/challenges/${challengeId}/join`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
