@@ -1096,10 +1096,11 @@ function generateKingMoves(state, moves, x, y, piece) {
 }
 
 function updateModeUI() {
+  console.log('updateModeUI called');
   // Online-only mode - always show challenge UI
-  challengeCreate.style.display = 'block';
-  challengeListContainer.style.display = 'block';
-  myChallengesContainer.style.display = 'none';
+  if (challengeCreate) challengeCreate.style.display = 'block';
+  if (challengeListContainer) challengeListContainer.style.display = 'block';
+  if (myChallengesContainer) myChallengesContainer.style.display = 'none';
   setStatus('Ready');
   loadChallenges();
 }
@@ -1186,8 +1187,10 @@ declineDrawBtn.addEventListener('click', () => {
 
 // Challenge System Functions
 async function loadChallenges() {
+  console.log('loadChallenges start');
   try {
     const server = serverInput.value.trim();
+    console.log('serverInput', server);
     if (!server) {
       log('Server URL not set');
       challengeList.innerHTML = '<p style="text-align: center; color: #999;">Enter server URL first</p>';
@@ -1195,9 +1198,11 @@ async function loadChallenges() {
     }
     
     const apiUrl = `${server.replace(/^wss?/, 'https')}/api/challenges`;
+    console.log('fetching', apiUrl);
     const response = await fetch(apiUrl);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
+    console.log('got data', data);
     challenges = data || [];
     displayChallenges();
   } catch (error) {
@@ -1207,6 +1212,7 @@ async function loadChallenges() {
 }
 
 function displayChallenges() {
+  console.log('displayChallenges', challenges);
   challengeList.innerHTML = '';
   
   if (challenges.length === 0) {
