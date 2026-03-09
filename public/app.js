@@ -1100,7 +1100,7 @@ function updateModeUI() {
   challengeCreate.style.display = 'block';
   challengeListContainer.style.display = 'block';
   myChallengesContainer.style.display = 'none';
-  setStatus('Disconnected');
+  setStatus('Ready');
   loadChallenges();
 }
 
