@@ -55,6 +55,7 @@ let localOverlayLocked = false;
 let challengeRefreshTimer = null;
 
 const ACTIVE_ROOM_KEY = 'activeRoom';
+const DEFAULT_ROOM = 'DEFAULT';
 
 const PIECES = {
   w: { K: '♔', Q: '♕', R: '♖', B: '♗', N: '♘', P: '♙' },
@@ -133,11 +134,11 @@ function toHttpUrl(serverUrl) {
 
 function connect(roomOverride = '') {
   const server = normalizeServerUrl(serverInput.value);
-  const room = (roomOverride || (roomInput ? roomInput.value.trim() : '')).trim();
+  const room = (roomOverride || getSavedRoom() || (roomInput ? roomInput.value.trim() : '') || DEFAULT_ROOM).trim();
   const name = nameInput.value.trim() || 'Player';
 
-  if (!server || !room) {
-    log('Enter server URL and room code.');
+  if (!server) {
+    log('Enter server URL.');
     return;
   }
 
@@ -1187,9 +1188,7 @@ function updateModeUI() {
   }, 10000);
 
   const savedRoom = getSavedRoom();
-  if (savedRoom) {
-    connect(savedRoom);
-  }
+  connect(savedRoom || DEFAULT_ROOM);
 }
 
 
