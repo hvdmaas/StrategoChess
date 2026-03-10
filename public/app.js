@@ -82,9 +82,27 @@ function getDefaultServer() {
   return 'wss://strategochess.onrender.com';
 }
 
-function connect() {
-  const server = serverInput.value.trim();
-  const room = roomInput ? roomInput.value.trim() : '';
+function normalizeServerUrl(rawUrl) {
+  const value = (rawUrl || '').trim();
+  if (!value) return null;
+  if (/^wss?:\/\//i.test(value) || /^https?:\/\//i.test(value)) {
+    return value;
+  }
+  return `wss://${value}`;
+}
+
+function toHttpUrl(serverUrl) {
+  const normalized = normalizeServerUrl(serverUrl);
+  if (!normalized) return null;
+
+  if (/^wss:\/\//i.test(normalized)) return normalized.replace(/^wss:\/\//i, 'https://');
+  if (/^ws:\/\//i.test(normalized)) return normalized.replace(/^ws:\/\//i, 'http://');
+  return normalized;
+}
+
+function connect(roomOverride = '') {
+  const server = normalizeServerUrl(serverInput.value);
+  const room = (roomOverride || (roomInput ? roomInput.value.trim() : '')).trim();
   const name = nameInput.value.trim() || 'Player';
 
   if (!server || !room) {
@@ -98,6 +116,7 @@ function connect() {
 
   if (ws) ws.close();
   ws = new WebSocket(server);
+  serverInput.value = server;
 
   ws.onopen = () => {
     setStatus('Connected');
@@ -106,6 +125,10 @@ function connect() {
 
   ws.onclose = () => {
     setStatus('Disconnected');
+  };
+
+  ws.onerror = () => {
+    log('Connection error. Check the server URL and try again.');
   };
 
   ws.onmessage = (event) => {
@@ -1215,7 +1238,7 @@ declineDrawBtn.addEventListener('click', () => {
 async function loadChallenges() {
   console.log('loadChallenges start');
   try {
-    const server = serverInput.value.trim();
+    const server = toHttpUrl(serverInput.value);
     console.log('serverInput', server);
     if (!server) {
       log('Server URL not set');
@@ -1223,7 +1246,7 @@ async function loadChallenges() {
       return;
     }
     
-    const apiUrl = `${server.replace(/^wss?/, 'https')}/api/challenges`;
+    const apiUrl = `${server}/api/challenges`;
     console.log('fetching', apiUrl);
     const response = await fetch(apiUrl);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -1275,14 +1298,14 @@ async function createChallenge() {
   const increment = challengeIncrementInput ? parseInt(challengeIncrementInput.value) || 0 : 0;
   
   try {
-    const server = serverInput.value.trim();
+    const server = toHttpUrl(serverInput.value);
     console.log('createChallenge serverInput', server);
     if (!server) {
       log('Server URL not set');
       return;
     }
     
-    const apiUrl = `${server.replace(/^wss?/, 'https')}/api/challenges`;
+    const apiUrl = `${server}/api/challenges`;
     console.log('createChallenge POST', apiUrl, { creatorName: playerName, timeControl: { minutes, increment } });
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -1298,6 +1321,7 @@ async function createChallenge() {
     console.log('createChallenge response', data);
     if (data.success) {
       log(`Challenge created! Room: ${data.room}`);
+      await loadChallenges();
       connectWithRoom(data.room);
     } else {
       log('Failed to create challenge');
@@ -1310,9 +1334,13 @@ async function createChallenge() {
 
 async function joinChallenge(challengeId) {
   try {
-    const server = serverInput.value.trim();
+    const server = toHttpUrl(serverInput.value);
     console.log('joinChallenge serverInput', server, 'id', challengeId);
-    const response = await fetch(`${server.replace(/^wss?/, 'https')}/api/challenges/${challengeId}/join`, {
+    if (!server) {
+      log('Server URL not set');
+      return;
+    }
+    const response = await fetch(`${server}/api/challenges/${challengeId}/join`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ playerName: nameInput.value.trim() || 'Player' })
@@ -1321,8 +1349,7 @@ async function joinChallenge(challengeId) {
     const data = await response.json();
     if (data.success) {
       log(`Joined challenge! Room: ${data.room}`);
-      roomInput = document.createElement('input');
-      roomInput.value = data.room;
+      await loadChallenges();
       connectWithRoom(data.room);
     } else {
       log('Failed to join challenge');
@@ -1335,8 +1362,12 @@ async function joinChallenge(challengeId) {
 
 async function deleteChallenge(challengeId) {
   try {
-    const server = serverInput.value.trim();
-    const response = await fetch(`${server.replace(/^wss?/, 'https')}/api/challenges/${challengeId}`, {
+    const server = toHttpUrl(serverInput.value);
+    if (!server) {
+      log('Server URL not set');
+      return;
+    }
+    const response = await fetch(`${server}/api/challenges/${challengeId}`, {
       method: 'DELETE'
     });
     
@@ -1382,28 +1413,11 @@ function showChallengeList() {
 }
 
 function connectWithRoom(room) {
-  const server = serverInput.value.trim();
-  const name = nameInput.value.trim() || 'Player';
-  
-  if (!server || !room) return;
-  
-  localMode = false;
-  overlayHide();
-  aiEnabled = false;
-  
-  if (ws) ws.close();
-  ws = new WebSocket(server);
-  ws.onopen = () => {
-    setStatus('Connected');
-    send({ type: 'join', room, playerId: generatePlayerId(), name });
-  };
-  ws.onmessage = onWsMessage;
-  ws.onclose = () => setStatus('Disconnected');
-  ws.onerror = () => log('Connection error');
-}
-
-function generatePlayerId() {
-  return 'player_' + Math.random().toString(36).substr(2, 9);
+  if (!room) return;
+  if (roomInput) {
+    roomInput.value = room;
+  }
+  connect(room);
 }
 
 // Flag Confirmation

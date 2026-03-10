@@ -5,8 +5,18 @@ import url from 'url';
 
 const PORT = process.env.PORT || 8787;
 const START_CLOCK_MS = 5 * 60 * 1000;
+const CHALLENGE_TTL_MS = 60 * 60 * 1000;
 
 const challenges = [];
+
+function pruneChallenges() {
+  const cutoff = Date.now() - CHALLENGE_TTL_MS;
+  for (let i = challenges.length - 1; i >= 0; i--) {
+    if (challenges[i].createdAt < cutoff) {
+      challenges.splice(i, 1);
+    }
+  }
+}
 
 const server = http.createServer((req, res) => {
   const parsedUrl = url.parse(req.url, true);
@@ -23,6 +33,8 @@ const server = http.createServer((req, res) => {
     res.end();
     return;
   }
+
+  pruneChallenges();
   
   if (pathname === '/api/challenges' && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -54,8 +66,10 @@ const server = http.createServer((req, res) => {
     req.on('data', chunk => { body += chunk; });
     req.on('end', () => {
       try {
-        const challenge = challenges.find(c => c.id === challengeId);
+        const idx = challenges.findIndex(c => c.id === challengeId);
+        const challenge = idx >= 0 ? challenges[idx] : null;
         if (!challenge) throw new Error('Challenge not found');
+        challenges.splice(idx, 1);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: true, room: challenge.room }));
       } catch (e) {
