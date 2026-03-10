@@ -52,6 +52,8 @@ const server = http.createServer((req, res) => {
           room: String(Math.floor(Math.random() * 9000) + 1000),
           createdAt: Date.now()
         };
+        const room = getRoom(challenge.room);
+        applyRoomClockConfig(room, challenge.timeControl);
         challenges.push(challenge);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: true, ...challenge }));
@@ -157,6 +159,16 @@ function getRoom(code) {
     rooms.set(code, room);
   }
   return rooms.get(code);
+}
+
+function applyRoomClockConfig(room, timeControl = {}) {
+  const minutes = Math.max(1, Math.min(60, parseInt(timeControl.minutes, 10) || 5));
+  const increment = Math.max(0, Math.min(30, parseInt(timeControl.increment, 10) || 0));
+  room.clockConfig = { minutes, increment };
+  room.state.clocks = { w: minutes * 60 * 1000, b: minutes * 60 * 1000 };
+  room.state.incrementMs = increment * 1000;
+  room.state.lastTick = Date.now();
+  room.lastClockBroadcast = { ...room.state.clocks };
 }
 
 function coordsToAlgebraic(x, y) {
@@ -464,6 +476,7 @@ function startGameIfReady(room) {
   if (state.playersReady.w && state.playersReady.b && !state.running && !state.gameOver) {
     state.running = true;
     state.lastTick = Date.now();
+    broadcast(room, { type: 'notice', text: 'Both players are ready. Game started.' });
     broadcastState(room);
   }
 }
@@ -515,12 +528,8 @@ function handleMove(room, color, move) {
 function handleClockConfig(room, ws, color, minutes, increment) {
   if (room.state.running || room.state.gameOver) return;
   if (!['w', 'b'].includes(color)) return;
-  const m = Math.max(1, Math.min(60, parseInt(minutes, 10) || 5));
-  const inc = Math.max(0, Math.min(30, parseInt(increment, 10) || 0));
-  room.clockConfig = { minutes: m, increment: inc };
-  room.state.clocks = { w: m * 60 * 1000, b: m * 60 * 1000 };
-  room.state.incrementMs = inc * 1000;
-  room.lastClockBroadcast = { ...room.state.clocks };
+  applyRoomClockConfig(room, { minutes, increment });
+  const { minutes: m, increment: inc } = room.clockConfig;
   broadcast(room, { type: 'clock_config', minutes: m, increment: inc, clocks: room.state.clocks });
   broadcastState(room);
 }
@@ -577,6 +586,7 @@ wss.on('connection', (ws) => {
     if (msg.type === 'hello') {
       const code = (msg.room || '').trim().toUpperCase();
       room = getRoom(code || 'DEFAULT');
+      let challengeAccepted = false;
       if (room.state.running) {
         // Game already started, join as spectator
         room.spectators.add(ws);
@@ -587,6 +597,7 @@ wss.on('connection', (ws) => {
       } else if (!room.players.b) {
         room.players.b = ws;
         color = 'b';
+        challengeAccepted = true;
       } else {
         room.spectators.add(ws);
         color = 'spectator';
@@ -599,6 +610,9 @@ wss.on('connection', (ws) => {
         state: serializeState(room.state, color === 'b' ? 'b' : 'w'),
         clock: room.clockConfig
       });
+      if (challengeAccepted) {
+        broadcast(room, { type: 'notice', text: 'Challenge accepted. Both players connected.' });
+      }
       return;
     }
 
