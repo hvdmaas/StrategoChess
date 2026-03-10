@@ -69,7 +69,8 @@ header {
 }
 
 .top-rules,
-.controls-wide {
+.controls-wide,
+.bottom-server {
   padding: 8px 32px 0;
 }
 
