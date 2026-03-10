@@ -52,6 +52,9 @@ let selected = null;
 let localMode = false;
 let localView = 'w';
 let localOverlayLocked = false;
+let challengeRefreshTimer = null;
+
+const ACTIVE_ROOM_KEY = 'activeRoom';
 
 const PIECES = {
   w: { K: '♔', Q: '♕', R: '♖', B: '♗', N: '♘', P: '♙' },
@@ -80,6 +83,34 @@ function randomRoom() {
 
 function getDefaultServer() {
   return 'wss://strategochess.onrender.com';
+}
+
+function getSavedRoom() {
+  return (localStorage.getItem(ACTIVE_ROOM_KEY) || '').trim();
+}
+
+function saveActiveRoom(room) {
+  if (!room) return;
+  localStorage.setItem(ACTIVE_ROOM_KEY, room);
+}
+
+function clearActiveRoom() {
+  localStorage.removeItem(ACTIVE_ROOM_KEY);
+}
+
+function sortChallenges(list) {
+  return [...list].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+}
+
+function upsertChallenge(challenge) {
+  if (!challenge || !challenge.id) return;
+  const next = challenges.filter((item) => item.id !== challenge.id);
+  next.push(challenge);
+  challenges = sortChallenges(next);
+}
+
+function removeChallenge(challengeId) {
+  challenges = challenges.filter((challenge) => challenge.id !== challengeId);
 }
 
 function normalizeServerUrl(rawUrl) {
@@ -136,6 +167,7 @@ function connect(roomOverride = '') {
     if (msg.type === 'joined') {
       playerColor = msg.color;
       gameState = msg.state;
+      saveActiveRoom(msg.room);
       if (msg.clock) {
         clockMinInput.value = msg.clock.minutes;
         clockIncInput.value = msg.clock.increment;
@@ -1148,6 +1180,16 @@ function updateModeUI() {
   if (myChallengesContainer) myChallengesContainer.style.display = 'none';
   setStatus('Ready');
   loadChallenges();
+
+  if (challengeRefreshTimer) clearInterval(challengeRefreshTimer);
+  challengeRefreshTimer = setInterval(() => {
+    if (!document.hidden) loadChallenges();
+  }, 10000);
+
+  const savedRoom = getSavedRoom();
+  if (savedRoom) {
+    connect(savedRoom);
+  }
 }
 
 
@@ -1202,7 +1244,12 @@ if (flagConfirmYes) flagConfirmYes.addEventListener('click', () => confirmFlag()
 if (flagConfirmNo) flagConfirmNo.addEventListener('click', () => cancelFlagConfirmation());
 
 serverInput.value = localStorage.getItem('server') || getDefaultServer();
-serverInput.addEventListener('change', () => localStorage.setItem('server', serverInput.value));
+nameInput.value = localStorage.getItem('name') || '';
+serverInput.addEventListener('change', () => {
+  localStorage.setItem('server', serverInput.value);
+  clearActiveRoom();
+  loadChallenges();
+});
 nameInput.addEventListener('change', () => localStorage.setItem('name', nameInput.value));
 flipBoardSelect.addEventListener('change', () => {
   localStorage.setItem('flipBoard', flipBoardSelect.value);
@@ -1252,7 +1299,7 @@ async function loadChallenges() {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
     console.log('got data', data);
-    challenges = data || [];
+    challenges = sortChallenges(data || []);
     displayChallenges();
   } catch (error) {
     console.error('Failed to load challenges:', error);
@@ -1282,12 +1329,19 @@ function displayChallenges() {
     const creatorName = challenge.creatorName || 'Unknown';
     const minutes = challenge.timeControl?.minutes ?? 5;
     const increment = challenge.timeControl?.increment ?? 0;
+    const isMine = creatorName === (nameInput.value.trim() || 'Player');
     
     div.innerHTML = `
-      <span><strong>${creatorName}</strong> - ${minutes}+${increment}</span>
-      <button style="padding: 4px 12px; cursor: pointer;">Join</button>
+      <span><strong>${isMine ? `${creatorName} (You)` : creatorName}</strong> - ${minutes}+${increment}</span>
+      <button style="padding: 4px 12px; cursor: pointer;">${isMine ? 'Open' : 'Join'}</button>
     `;
-    div.querySelector('button').onclick = () => joinChallenge(challenge.id);
+    div.querySelector('button').onclick = () => {
+      if (isMine) {
+        connectWithRoom(challenge.room);
+        return;
+      }
+      joinChallenge(challenge.id);
+    };
     challengeList.appendChild(div);
   });
 }
@@ -1320,8 +1374,11 @@ async function createChallenge() {
     const data = await response.json();
     console.log('createChallenge response', data);
     if (data.success) {
+      upsertChallenge(data);
+      displayChallenges();
       log(`Challenge created! Room: ${data.room}`);
-      await loadChallenges();
+      saveActiveRoom(data.room);
+      loadChallenges();
       connectWithRoom(data.room);
     } else {
       log('Failed to create challenge');
@@ -1348,8 +1405,11 @@ async function joinChallenge(challengeId) {
     
     const data = await response.json();
     if (data.success) {
+      removeChallenge(challengeId);
+      displayChallenges();
       log(`Joined challenge! Room: ${data.room}`);
-      await loadChallenges();
+      saveActiveRoom(data.room);
+      loadChallenges();
       connectWithRoom(data.room);
     } else {
       log('Failed to join challenge');
@@ -1373,6 +1433,8 @@ async function deleteChallenge(challengeId) {
     
     const data = await response.json();
     if (data.success) {
+      removeChallenge(challengeId);
+      displayChallenges();
       log('Challenge deleted');
       loadChallenges();
     }
@@ -1414,6 +1476,7 @@ function showChallengeList() {
 
 function connectWithRoom(room) {
   if (!room) return;
+  saveActiveRoom(room);
   if (roomInput) {
     roomInput.value = room;
   }
