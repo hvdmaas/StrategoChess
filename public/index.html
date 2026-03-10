@@ -17,42 +17,45 @@
 
   <section class="controls-wide">
     <div class="panel wide">
-      <div class="field">
-        <label for="name">Name</label>
-        <input id="name" type="text" placeholder="Player name" />
+      <div class="lobby-card">
+        <h3>Lobby</h3>
+        <div class="field">
+          <label for="name">Name</label>
+          <input id="name" type="text" placeholder="Player name" />
+        </div>
       </div>
       
-      <!-- Challenge Creation -->
-      <div id="challenge-create" class="field" style="display:block; margin-top: 15px;">
-        <label for="challenge-time">Time Control (minutes)</label>
-        <input id="challenge-time" type="number" min="1" max="60" value="5" />
-        <label for="challenge-increment">Increment (seconds)</label>
-        <input id="challenge-increment" type="number" min="0" max="30" value="0" />
+      <div class="lobby-card" id="challenge-create" style="display:block;">
+        <h3>Create Challenge</h3>
+        <div class="field">
+          <label for="challenge-time">Time Control (minutes)</label>
+          <input id="challenge-time" type="number" min="1" max="60" value="5" />
+        </div>
+        <div class="field">
+          <label for="challenge-increment">Increment (seconds)</label>
+          <input id="challenge-increment" type="number" min="0" max="30" value="0" />
+        </div>
         <div class="actions">
           <button id="create-challenge">Create Challenge</button>
         </div>
       </div>
 
-      <!-- Challenge List -->
-      <div id="challenge-list-container" style="display:block; margin-top: 15px;">
+      <div class="lobby-card" id="challenge-list-container" style="display:block;">
         <h3>Available Challenges</h3>
-        <div id="challenge-list" style="max-height: 200px; overflow-y: auto; border: 1px solid #ccc; border-radius: 4px; padding: 8px;"><p style="text-align: center; color: #999;">Loading...</p></div>
-        <div class="actions" style="margin-top: 10px;">
+        <div id="challenge-list" class="challenge-scroll"><p style="text-align: center; color: #999;">Loading...</p></div>
+        <div class="actions lobby-actions">
           <button id="refresh-challenges">Refresh</button>
           <button id="my-challenges">My Challenges</button>
         </div>
       </div>
 
-      <!-- My Challenges -->
-      <div id="my-challenges-container" style="display:none; margin-top: 15px;">
+      <div class="lobby-card" id="my-challenges-container" style="display:none;">
         <h3>My Challenges</h3>
-        <div id="my-challenges-list" style="max-height: 150px; overflow-y: auto; border: 1px solid #ccc; border-radius: 4px; padding: 8px;"></div>
-        <div class="actions" style="margin-top: 10px;">
+        <div id="my-challenges-list" class="challenge-scroll"></div>
+        <div class="actions lobby-actions">
           <button id="back-to-list">Back to Challenges</button>
         </div>
       </div>
-
-
     </div>
   </section>
 
@@ -73,8 +76,8 @@
       </div>
     </div>
     <div class="sidebar">
-      <div class="card" id="instructions">
-        <h3>Setup</h3>
+      <div class="card hero-card" id="instructions">
+        <h3>Game Status</h3>
         <p>Select your hidden flag pawn by clicking one of your pawns. The other player cannot see it.</p>
       </div>
       <div class="card" id="game-actions">
@@ -104,7 +107,10 @@
         <h3>Moves</h3>
         <ol id="move-list"></ol>
       </div>
-      <div class="card" id="log"></div>
+      <div class="card" id="log-card">
+        <h3>Match Log</h3>
+        <div id="log"></div>
+      </div>
     </div>
   </section>
 
