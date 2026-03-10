@@ -63,6 +63,7 @@ let lastAiMoveKey = null;
 let lastAiState = null;
 let puzzlePlayerColor = 'w';
 const aiColor = 'b';
+let moveAudioCtx = null;
 
 const puzzleStartBtn = document.getElementById('puzzle-start');
 const puzzleSelect = document.getElementById('puzzle-select');
@@ -89,6 +90,71 @@ function fmt(ms) {
   const s = String(total % 60).padStart(2, '0');
   return `${m}:${s}`;
 }
+
+function getMoveKey(state) {
+  if (!state || !state.lastMove) return '';
+  const { from, to } = state.lastMove;
+  return `${from.x}${from.y}${to.x}${to.y}:${state.turn}`;
+}
+
+function shouldPlayMoveTurnSound(prevState, nextState) {
+  if (!prevState || !nextState || !nextState.lastMove) return false;
+  if (nextState.gameOver) return false;
+  return getMoveKey(prevState) !== getMoveKey(nextState);
+}
+
+function ensureMoveAudio() {
+  if (moveAudioCtx) return moveAudioCtx;
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx) return null;
+  moveAudioCtx = new AudioCtx();
+  return moveAudioCtx;
+}
+
+async function playMoveTurnSound() {
+  try {
+    const ctx = ensureMoveAudio();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') {
+      await ctx.resume();
+    }
+
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(830, now);
+    osc.frequency.exponentialRampToValueAtTime(620, now + 0.06);
+
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(1800, now);
+
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.08, now + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.11);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.12);
+  } catch (error) {
+    // Ignore audio failures; gameplay should continue silently.
+  }
+}
+
+function primeMoveAudio() {
+  const ctx = ensureMoveAudio();
+  if (ctx && ctx.state === 'suspended') {
+    ctx.resume().catch(() => {});
+  }
+}
+
+window.addEventListener('pointerdown', primeMoveAudio, { passive: true });
+window.addEventListener('keydown', primeMoveAudio);
 
 function randomRoom() {
   // Generate 4-digit code
@@ -196,8 +262,12 @@ function connect(roomOverride = '') {
     }
 
     if (msg.type === 'state') {
+      const prevState = gameState;
       gameState = msg.state;
       myFlagId = msg.state.flagId || myFlagId;
+      if (shouldPlayMoveTurnSound(prevState, gameState)) {
+        playMoveTurnSound();
+      }
       render();
       return;
     }
@@ -516,6 +586,9 @@ function endLocalTurn() {
   if (gameState.gameOver) {
     const winner = gameState.winner ? gameState.winner.toUpperCase() : 'None';
     showGameOverOverlay(winner, gameState.reason);
+  }
+  if (!gameState.gameOver) {
+    playMoveTurnSound();
   }
   render();
   // Note: render() already calls maybeAiMove() for AI, no need to duplicate
