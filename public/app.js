@@ -11,7 +11,6 @@ const clockBlackWrap = document.getElementById('clock-black');
 const clockMinInput = document.getElementById('clock-min');
 const clockIncInput = document.getElementById('clock-inc');
 const clockApplyBtn = document.getElementById('clock-apply');
-const flipBoardSelect = document.getElementById('flip-board');
 const moveListEl = document.getElementById('move-list');
 const resignBtn = document.getElementById('resign');
 const offerDrawBtn = document.getElementById('offer-draw');
@@ -55,7 +54,6 @@ let localOverlayLocked = false;
 let challengeRefreshTimer = null;
 let myFlagId = null;
 let lastGameOver = false;
-let flipBoardForBlack = false;
 let aiEnabled = false;
 let puzzleMode = false;
 let localTick = null;
@@ -287,7 +285,7 @@ function updateInstructions() {
 
 function renderBoard() {
   boardEl.innerHTML = '';
-  const flip = (localMode ? localView : playerColor) === 'b' && flipBoardForBlack;
+  const flip = (localMode ? localView : playerColor) === 'b';
   const viewColor = localMode ? localView : playerColor;
 
   for (let r = 0; r < 8; r++) {
@@ -1265,11 +1263,6 @@ serverInput.addEventListener('change', () => {
   loadChallenges();
 });
 nameInput.addEventListener('change', () => localStorage.setItem('name', nameInput.value));
-flipBoardSelect.addEventListener('change', () => {
-  localStorage.setItem('flipBoard', flipBoardSelect.value);
-  flipBoardForBlack = flipBoardSelect.value === 'on';
-  renderBoard();
-});
 
 resignBtn.addEventListener('click', () => {
   if (!gameState || gameState.gameOver) return;
@@ -1691,8 +1684,5 @@ clockIncInput.addEventListener('change', () => {
   localStorage.setItem('clockIncrement', clockIncInput.value);
   applyClockSettings();
 });
-
-flipBoardSelect.value = localStorage.getItem('flipBoard') || 'off';
-flipBoardForBlack = flipBoardSelect.value === 'on';
 
 updateModeUI();

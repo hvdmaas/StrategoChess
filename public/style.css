@@ -101,6 +101,28 @@ header {
   flex-wrap: wrap;
 }
 
+#challenge-list,
+#my-challenges-list {
+  background: #10131c;
+}
+
+#challenge-list > div,
+#my-challenges-list > div {
+  color: #10131c;
+}
+
+#challenge-list > div strong,
+#my-challenges-list > div strong,
+#challenge-list > div span,
+#my-challenges-list > div span {
+  color: #10131c;
+}
+
+#challenge-list > div button {
+  background: var(--accent2);
+  color: #081413;
+}
+
 button {
   padding: 10px 14px;
   border-radius: 10px;
