@@ -141,6 +141,10 @@ header {
   background: #1a1a18;
 }
 
+.hidden-clock-controls {
+  display: none;
+}
+
 #challenge-list,
 #my-challenges-list {
   background: #1a1a18;

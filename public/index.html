@@ -89,20 +89,6 @@
           <button id="decline-draw">Decline Draw</button>
         </div>
       </div>
-      <div class="card" id="clock-settings">
-        <h3>Clock</h3>
-        <div class="field">
-          <label for="clock-min">Minutes</label>
-          <input id="clock-min" type="number" min="1" max="60" value="5" />
-        </div>
-        <div class="field">
-          <label for="clock-inc">Increment (sec)</label>
-          <input id="clock-inc" type="number" min="0" max="30" value="0" />
-        </div>
-        <div class="actions">
-          <button id="clock-apply">Apply</button>
-        </div>
-      </div>
       <div class="card" id="moves-card">
         <h3>Moves</h3>
         <ol id="move-list"></ol>
@@ -140,6 +126,11 @@
       <div class="field">
         <label for="server">Server URL</label>
         <input id="server" type="text" placeholder="wss://strategochess.onrender.com" />
+      </div>
+      <div class="hidden-clock-controls" aria-hidden="true">
+        <input id="clock-min" type="number" min="1" max="60" value="5" />
+        <input id="clock-inc" type="number" min="0" max="30" value="0" />
+        <button id="clock-apply" type="button">Apply</button>
       </div>
     </div>
   </section>
