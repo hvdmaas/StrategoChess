@@ -53,6 +53,21 @@ let localMode = false;
 let localView = 'w';
 let localOverlayLocked = false;
 let challengeRefreshTimer = null;
+let myFlagId = null;
+let lastGameOver = false;
+let flipBoardForBlack = false;
+let aiEnabled = false;
+let puzzleMode = false;
+let localTick = null;
+let localClockBaseMs = 5 * 60 * 1000;
+let localClockIncrementMs = 0;
+let lastAiMoveKey = null;
+let lastAiState = null;
+let puzzlePlayerColor = 'w';
+const aiColor = 'b';
+
+const puzzleStartBtn = document.getElementById('puzzle-start');
+const puzzleSelect = document.getElementById('puzzle-select');
 
 const ACTIVE_ROOM_KEY = 'activeRoom';
 const DEFAULT_ROOM = 'DEFAULT';
@@ -1252,6 +1267,7 @@ serverInput.addEventListener('change', () => {
 nameInput.addEventListener('change', () => localStorage.setItem('name', nameInput.value));
 flipBoardSelect.addEventListener('change', () => {
   localStorage.setItem('flipBoard', flipBoardSelect.value);
+  flipBoardForBlack = flipBoardSelect.value === 'on';
   renderBoard();
 });
 
@@ -1458,8 +1474,11 @@ async function showMyChallenges() {
   myChallenges.forEach(challenge => {
     const div = document.createElement('div');
     div.style.cssText = 'padding: 8px; margin: 5px 0; background: #fff3cd; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;';
+    const creatorName = challenge.creatorName || 'Unknown';
+    const minutes = challenge.timeControl?.minutes ?? 5;
+    const increment = challenge.timeControl?.increment ?? 0;
     div.innerHTML = `
-      <span>${challenge.timeControl.minutes}+${challenge.timeControl.increment}</span>
+      <span><strong>${creatorName}</strong> - ${minutes}+${increment}</span>
       <button style="padding: 4px 12px; cursor: pointer; background: #dc3545; color: white; border: none; border-radius: 3px;">Delete</button>
     `;
     div.querySelector('button').onclick = () => deleteChallenge(challenge.id);
@@ -1497,11 +1516,13 @@ function cancelFlagConfirmation() {
   cancelFlagSelection(localView);
 }
 
-puzzleStartBtn.addEventListener('click', () => {
-  const key = puzzleSelect.value;
-  if (!key) return;
-  startPuzzle(key);
-});
+if (puzzleStartBtn && puzzleSelect) {
+  puzzleStartBtn.addEventListener('click', () => {
+    const key = puzzleSelect.value;
+    if (!key) return;
+    startPuzzle(key);
+  });
+}
 
 function startPuzzle(key) {
   localMode = true;
@@ -1670,5 +1691,8 @@ clockIncInput.addEventListener('change', () => {
   localStorage.setItem('clockIncrement', clockIncInput.value);
   applyClockSettings();
 });
+
+flipBoardSelect.value = localStorage.getItem('flipBoard') || 'off';
+flipBoardForBlack = flipBoardSelect.value === 'on';
 
 updateModeUI();
