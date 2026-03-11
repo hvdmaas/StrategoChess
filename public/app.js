@@ -383,7 +383,10 @@ function renderBoard() {
           (localMode && puzzleMode && piece.isFlag && piece.color === viewColor) ||
           (localMode && gameState.running && piece.isFlag && piece.color === 'w')
         );
-        if (showFlag) square.classList.add('flagged');
+        if (showFlag) {
+          square.classList.add('flagged');
+          pieceEl.classList.add('flag-piece');
+        }
 
         if (canDragPiece(piece, viewColor)) {
           pieceEl.setAttribute('draggable', 'true');
