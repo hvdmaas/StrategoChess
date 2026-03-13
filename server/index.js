@@ -1,13 +1,116 @@
 import http from 'http';
 import crypto from 'crypto';
+import fs from 'fs/promises';
+import path from 'path';
+import pg from 'pg';
 import { WebSocketServer } from 'ws';
 import url from 'url';
+import { fileURLToPath } from 'url';
 
 const PORT = process.env.PORT || 8787;
 const START_CLOCK_MS = 5 * 60 * 1000;
 const CHALLENGE_TTL_MS = 60 * 60 * 1000;
+const DATABASE_URL = process.env.DATABASE_URL || '';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const STATS_PATH = path.join(__dirname, 'data', 'stats.json');
+const { Pool } = pg;
 
 const challenges = [];
+let stats = {
+  gamesStarted: 0,
+  gamesFinished: 0,
+  finishesByReason: {}
+};
+let statsDb = null;
+
+function normalizeStatsRow(row = {}) {
+  return {
+    gamesStarted: Number(row.games_started ?? row.gamesStarted) || 0,
+    gamesFinished: Number(row.games_finished ?? row.gamesFinished) || 0,
+    finishesByReason: row.finishes_by_reason ?? row.finishesByReason ?? {}
+  };
+}
+
+async function initStatsDb() {
+  if (!DATABASE_URL) return;
+  statsDb = new Pool({
+    connectionString: DATABASE_URL,
+    ssl: DATABASE_URL.includes('localhost') ? false : { rejectUnauthorized: false }
+  });
+
+  await statsDb.query(`
+    CREATE TABLE IF NOT EXISTS server_stats (
+      id INTEGER PRIMARY KEY,
+      games_started INTEGER NOT NULL DEFAULT 0,
+      games_finished INTEGER NOT NULL DEFAULT 0,
+      finishes_by_reason JSONB NOT NULL DEFAULT '{}'::jsonb
+    )
+  `);
+
+  await statsDb.query(`
+    INSERT INTO server_stats (id, games_started, games_finished, finishes_by_reason)
+    VALUES (1, 0, 0, '{}'::jsonb)
+    ON CONFLICT (id) DO NOTHING
+  `);
+}
+
+async function loadStats() {
+  if (statsDb) {
+    const result = await statsDb.query(
+      'SELECT games_started, games_finished, finishes_by_reason FROM server_stats WHERE id = 1'
+    );
+    stats = normalizeStatsRow(result.rows[0]);
+    return;
+  }
+
+  try {
+    const raw = await fs.readFile(STATS_PATH, 'utf8');
+    stats = normalizeStatsRow(JSON.parse(raw));
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      console.error('Failed to load stats:', error);
+    }
+  }
+}
+
+async function saveStats() {
+  if (statsDb) {
+    await statsDb.query(
+      `
+        UPDATE server_stats
+        SET games_started = $1,
+            games_finished = $2,
+            finishes_by_reason = $3::jsonb
+        WHERE id = 1
+      `,
+      [stats.gamesStarted, stats.gamesFinished, JSON.stringify(stats.finishesByReason)]
+    );
+    return;
+  }
+
+  try {
+    await fs.mkdir(path.dirname(STATS_PATH), { recursive: true });
+    await fs.writeFile(STATS_PATH, JSON.stringify(stats, null, 2));
+  } catch (error) {
+    console.error('Failed to save stats:', error);
+  }
+}
+
+function recordGameStarted(room) {
+  if (room.meta.startedRecorded) return;
+  room.meta.startedRecorded = true;
+  stats.gamesStarted += 1;
+  saveStats().catch((error) => console.error('Failed to persist started stats:', error));
+}
+
+function recordGameFinished(room) {
+  if (room.meta.finishedRecorded || !room.state.gameOver || !room.state.reason) return;
+  room.meta.finishedRecorded = true;
+  stats.gamesFinished += 1;
+  stats.finishesByReason[room.state.reason] = (stats.finishesByReason[room.state.reason] || 0) + 1;
+  saveStats().catch((error) => console.error('Failed to persist finished stats:', error));
+}
 
 function pruneChallenges() {
   const cutoff = Date.now() - CHALLENGE_TTL_MS;
@@ -39,6 +142,12 @@ const server = http.createServer((req, res) => {
   if (pathname === '/api/challenges' && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(challenges));
+  } else if (pathname === '/api/stats' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      ...stats,
+      backend: statsDb ? 'postgres' : 'file'
+    }));
   } else if (pathname === '/api/challenges' && req.method === 'POST') {
     let body = '';
     req.on('data', chunk => { body += chunk; });
@@ -153,7 +262,8 @@ function getRoom(code) {
       spectators: new Set(),
       tickInterval: null,
       lastClockBroadcast: { w: START_CLOCK_MS, b: START_CLOCK_MS },
-      clockConfig: { minutes: 5, increment: 0 }
+      clockConfig: { minutes: 5, increment: 0 },
+      meta: { startedRecorded: false, finishedRecorded: false }
     };
     room.tickInterval = setInterval(() => tickRoom(room), 250);
     rooms.set(code, room);
@@ -263,6 +373,7 @@ function tickRoom(room) {
     state.running = false;
     state.winner = state.turn === 'w' ? 'b' : 'w';
     state.reason = 'timeout';
+    recordGameFinished(room);
     broadcastState(room);
     return;
   }
@@ -476,6 +587,7 @@ function startGameIfReady(room) {
   if (state.playersReady.w && state.playersReady.b && !state.running && !state.gameOver) {
     state.running = true;
     state.lastTick = Date.now();
+    recordGameStarted(room);
     broadcast(room, { type: 'notice', text: 'Both players are ready. Game started.' });
     broadcastState(room);
   }
@@ -522,6 +634,7 @@ function handleMove(room, color, move) {
   }
 
   room.state.lastTick = Date.now();
+  recordGameFinished(room);
   broadcastState(room);
 }
 
@@ -540,6 +653,7 @@ function handleResign(room, color) {
   room.state.running = false;
   room.state.winner = color === 'w' ? 'b' : 'w';
   room.state.reason = 'resign';
+  recordGameFinished(room);
   broadcast(room, { type: 'notice', text: `${color === 'w' ? 'White' : 'Black'} resigned.` });
   broadcastState(room);
 }
@@ -559,6 +673,7 @@ function handleAcceptDraw(room, color) {
   room.state.winner = null;
   room.state.reason = 'draw';
   room.state.drawOfferedBy = null;
+  recordGameFinished(room);
   broadcast(room, { type: 'notice', text: 'Draw agreed.' });
   broadcastState(room);
 }
@@ -655,6 +770,9 @@ wss.on('connection', (ws) => {
     room.spectators.delete(ws);
   });
 });
+
+await initStatsDb();
+await loadStats();
 
 server.listen(PORT, () => {
   console.log(`Stratego Chess server running on ${PORT}`);

@@ -1,5 +1,6 @@
 const serverInput = document.getElementById('server');
 const nameInput = document.getElementById('name');
+const gamesPlayedEl = document.getElementById('games-played');
 const boardEl = document.getElementById('board');
 const statusEl = document.getElementById('status');
 const logEl = document.getElementById('log');
@@ -82,6 +83,12 @@ function log(msg) {
 
 function setStatus(msg) {
   statusEl.textContent = msg;
+}
+
+function setGamesPlayed(text) {
+  if (gamesPlayedEl) {
+    gamesPlayedEl.textContent = text;
+  }
 }
 
 function fmt(ms) {
@@ -209,6 +216,20 @@ function toHttpUrl(serverUrl) {
   if (/^wss:\/\//i.test(normalized)) return normalized.replace(/^wss:\/\//i, 'https://');
   if (/^ws:\/\//i.test(normalized)) return normalized.replace(/^ws:\/\//i, 'http://');
   return normalized;
+}
+
+async function loadStats() {
+  try {
+    const server = toHttpUrl(serverInput.value);
+    if (!server) return;
+    const response = await fetch(`${server}/api/stats`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    const finished = Number(data.gamesFinished) || 0;
+    setGamesPlayed(`Games played: ${finished}`);
+  } catch (error) {
+    setGamesPlayed('Games played: --');
+  }
 }
 
 function connect(roomOverride = '') {
@@ -1337,6 +1358,7 @@ serverInput.addEventListener('change', () => {
   localStorage.setItem('server', serverInput.value);
   clearActiveRoom();
   loadChallenges();
+  loadStats();
 });
 nameInput.addEventListener('change', () => localStorage.setItem('name', nameInput.value));
 
@@ -1762,3 +1784,4 @@ clockIncInput.addEventListener('change', () => {
 });
 
 updateModeUI();
+loadStats();
