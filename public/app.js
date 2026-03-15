@@ -333,10 +333,6 @@ function render() {
   updateActionButtons();
 }
 
-boardEl.addEventListener('touchstart', (event) => {
-  event.preventDefault();
-}, { passive: false });
-
 boardEl.addEventListener('touchmove', (event) => {
   event.preventDefault();
 }, { passive: false });
