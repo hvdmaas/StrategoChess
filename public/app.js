@@ -65,6 +65,7 @@ let lastAiState = null;
 let puzzlePlayerColor = 'w';
 const aiColor = 'b';
 let moveAudioCtx = null;
+let lastTouchSquareAt = 0;
 
 const puzzleStartBtn = document.getElementById('puzzle-start');
 const puzzleSelect = document.getElementById('puzzle-select');
@@ -436,7 +437,15 @@ function renderBoard() {
         }
       });
 
-      square.addEventListener('click', () => handleSquareClick(x, y));
+      square.addEventListener('click', () => {
+        if (Date.now() - lastTouchSquareAt < 400) return;
+        handleSquareClick(x, y);
+      });
+      square.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        lastTouchSquareAt = Date.now();
+        handleSquareClick(x, y);
+      }, { passive: false });
       if (gameState.lastMove) {
         const lm = gameState.lastMove;
         if ((lm.from.x === x && lm.from.y === y) || (lm.to.x === x && lm.to.y === y)) {
